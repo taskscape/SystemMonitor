@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>System Collector</title>
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">System Collector</p>
+        <h1>Fleet Health Dashboard</h1>
+        <p class="subtitle">Realtime ingest from SystemMonitorService with 7-day history.</p>
+      </div>
+      <div class="chip" id="statusChip">Idle</div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Machines</h2>
+          <p>Select a machine to inspect metrics and history.</p>
+        </div>
+        <div class="controls">
+          <label for="machineSelect">Machine</label>
+          <select id="machineSelect"></select>
+          <button id="refreshBtn">Refresh</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat">
+          <span>CPU</span>
+          <strong id="cpuNow">--</strong>
+          <small>Current utilisation</small>
+        </div>
+        <div class="stat">
+          <span>RAM</span>
+          <strong id="ramNow">--</strong>
+          <small>Current utilisation</small>
+        </div>
+        <div class="stat">
+          <span>HDD</span>
+          <strong id="diskNow">--</strong>
+          <small>Current utilisation</small>
+        </div>
+        <div class="stat">
+          <span>Last Sample</span>
+          <strong id="lastSeen">--</strong>
+          <small>UTC timestamp</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h3>CPU (7 days)</h3>
+          <span class="legend cpu">CPU %</span>
+        </div>
+        <canvas id="cpuChart" width="720" height="240"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>RAM (7 days)</h3>
+          <span class="legend ram">RAM %</span>
+        </div>
+        <canvas id="ramChart" width="720" height="240"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>HDD (7 days)</h3>
+          <span class="legend disk">Disk %</span>
+        </div>
+        <canvas id="diskChart" width="720" height="240"></canvas>
+      </div>
+    </section>
+
+    <section class="panel" id="drivesPanel">
+      <div class="panel-header">
+        <div>
+          <h2>Drives</h2>
+          <p>Current drive usage for the selected machine.</p>
+        </div>
+      </div>
+      <div id="driveList" class="drive-list"></div>
+    </section>
+  </div>
+
+  <script src="site.js"></script>
+</body>
+</html>
