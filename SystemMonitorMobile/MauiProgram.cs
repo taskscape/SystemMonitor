@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace SystemMonitorMobile;
@@ -19,7 +21,17 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+        try
+        {
+            using var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json")
+                .GetAwaiter()
+                .GetResult();
+            builder.Configuration.AddJsonStream(stream);
+        }
+        catch (Exception)
+        {
+            // Optional configuration file.
+        }
 
         var settings = new CollectorSettings();
         builder.Configuration.Bind(nameof(CollectorSettings), settings);

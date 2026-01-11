@@ -59,12 +59,13 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<Content Include="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
+		<MauiAsset Include="Resources\Raw\appsettings.json" LogicalName="appsettings.json" />
 	</ItemGroup>
 
 </Project>

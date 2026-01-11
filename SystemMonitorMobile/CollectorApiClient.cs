@@ -17,7 +17,7 @@ public sealed class CollectorApiClient
     {
         var url = new Uri(new Uri(_settings.BaseUrl), "/api/v1/machines");
         var machines = await _httpClient.GetFromJsonAsync<List<MachineSummaryDto>>(url, cancellationToken);
-        return machines ?? Array.Empty<MachineSummaryDto>();
+        return machines ?? new List<MachineSummaryDto>();
     }
 
     public async Task<MachineCurrentDto?> GetCurrentAsync(string machineName, CancellationToken cancellationToken)
@@ -33,6 +33,6 @@ public sealed class CollectorApiClient
     {
         var url = new Uri(new Uri(_settings.BaseUrl), $"/api/v1/machines/{Uri.EscapeDataString(machineName)}/history?days={days}");
         var points = await _httpClient.GetFromJsonAsync<List<HistoryPointDto>>(url, cancellationToken);
-        return points ?? Array.Empty<HistoryPointDto>();
+        return points ?? new List<HistoryPointDto>();
     }
 }
