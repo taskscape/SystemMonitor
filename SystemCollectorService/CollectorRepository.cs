@@ -22,6 +22,7 @@ public sealed class CollectorRepository
         {
             var machineId = await UpsertMachineAsync(connection, transaction, sample.MachineName, sample.Machine.TimestampUtc, cancellationToken);
             var machineSampleId = await InsertMachineSampleAsync(connection, transaction, machineId, sample.Machine, cancellationToken);
+            var driveTotals = SumDrives(sample.Drives);
 
             if (sample.Drives.Count > 0)
             {
@@ -32,6 +33,17 @@ public sealed class CollectorRepository
             {
                 await InsertProcessesAsync(connection, transaction, machineSampleId, sample.Processes, cancellationToken);
             }
+
+            var bucketStart = GetMinuteBucket(sample.Machine.TimestampUtc);
+            await UpsertMinuteCacheAsync(
+                connection,
+                transaction,
+                machineId,
+                bucketStart,
+                sample.Machine,
+                driveTotals.used,
+                driveTotals.total,
+                cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -63,35 +75,37 @@ public sealed class CollectorRepository
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
 
-        await using var sampleCommand = connection.CreateCommand();
-        sampleCommand.CommandText = """
-            SELECT m.name, ms.id, ms.timestamp_utc, ms.cpu_percent, ms.ram_used_bytes, ms.ram_total_bytes
+        await using var cacheCommand = connection.CreateCommand();
+        cacheCommand.CommandText = """
+            SELECT m.name, c.bucket_start_utc, c.cpu_percent_avg, c.ram_used_bytes_avg, c.ram_total_bytes_avg
             FROM machines m
-            JOIN machine_samples ms ON ms.machine_id = m.id
+            JOIN machine_minute_cache c ON c.machine_id = m.id
             WHERE m.name = $name
-            ORDER BY ms.timestamp_utc DESC
+            ORDER BY c.bucket_start_utc DESC
             LIMIT 1;
             """;
-        sampleCommand.Parameters.AddWithValue("$name", machineName);
+        cacheCommand.Parameters.AddWithValue("$name", machineName);
 
-        await using var reader = await sampleCommand.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        await using var cacheReader = await cacheCommand.ExecuteReaderAsync(cancellationToken);
+        if (!await cacheReader.ReadAsync(cancellationToken))
         {
             return null;
         }
 
-        var sampleId = reader.GetInt64(1);
         var dto = new MachineCurrentDto(
-            reader.GetString(0),
-            reader.GetFieldValue<DateTimeOffset>(2),
-            reader.GetDouble(3),
-            reader.GetInt64(4),
-            reader.GetInt64(5),
+            cacheReader.GetString(0),
+            cacheReader.GetFieldValue<DateTimeOffset>(1),
+            cacheReader.GetDouble(2),
+            cacheReader.GetDouble(3),
+            cacheReader.GetDouble(4),
             Array.Empty<DriveSnapshotDto>());
 
-        await reader.CloseAsync();
+        await cacheReader.CloseAsync();
 
-        var drives = await GetDrivesAsync(connection, sampleId, cancellationToken);
+        var sampleId = await GetLatestSampleIdAsync(connection, machineName, cancellationToken);
+        var drives = sampleId is null
+            ? Array.Empty<DriveSnapshotDto>()
+            : await GetDrivesAsync(connection, sampleId.Value, cancellationToken);
         return dto with { Drives = drives };
     }
 
@@ -106,18 +120,16 @@ public sealed class CollectorRepository
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT ms.timestamp_utc,
-                   ms.cpu_percent,
-                   ms.ram_used_bytes,
-                   ms.ram_total_bytes,
-                   COALESCE(SUM(ds.used_bytes), 0) AS drive_used,
-                   COALESCE(SUM(ds.total_bytes), 0) AS drive_total
+            SELECT c.bucket_start_utc,
+                   c.cpu_percent_avg,
+                   c.ram_used_bytes_avg,
+                   c.ram_total_bytes_avg,
+                   c.drive_used_bytes_avg,
+                   c.drive_total_bytes_avg
             FROM machines m
-            JOIN machine_samples ms ON ms.machine_id = m.id
-            LEFT JOIN drive_samples ds ON ds.machine_sample_id = ms.id
-            WHERE m.name = $name AND ms.timestamp_utc >= $cutoff
-            GROUP BY ms.id
-            ORDER BY ms.timestamp_utc;
+            JOIN machine_minute_cache c ON c.machine_id = m.id
+            WHERE m.name = $name AND c.bucket_start_utc >= $cutoff
+            ORDER BY c.bucket_start_utc;
             """;
         command.Parameters.AddWithValue("$name", machineName);
         command.Parameters.AddWithValue("$cutoff", cutoff);
@@ -135,6 +147,26 @@ public sealed class CollectorRepository
         }
 
         return results;
+    }
+
+    private static (double used, double total) SumDrives(IReadOnlyList<DriveSamplePayload> drives)
+    {
+        double used = 0;
+        double total = 0;
+        foreach (var drive in drives)
+        {
+            used += drive.UsedBytes;
+            total += drive.TotalBytes;
+        }
+
+        return (used, total);
+    }
+
+    private static DateTimeOffset GetMinuteBucket(DateTimeOffset timestampUtc)
+    {
+        var utc = timestampUtc.UtcDateTime;
+        var bucketUtc = new DateTime(utc.Year, utc.Month, utc.Day, utc.Hour, utc.Minute, 0, DateTimeKind.Utc);
+        return new DateTimeOffset(bucketUtc);
     }
 
     private static async Task<int> UpsertMachineAsync(
@@ -183,6 +215,63 @@ public sealed class CollectorRepository
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt64(result);
+    }
+
+    private static async Task UpsertMinuteCacheAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        int machineId,
+        DateTimeOffset bucketStartUtc,
+        MachineSamplePayload machine,
+        double driveUsedBytes,
+        double driveTotalBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO machine_minute_cache (
+                machine_id,
+                bucket_start_utc,
+                sample_count,
+                cpu_percent_avg,
+                ram_used_bytes_avg,
+                ram_total_bytes_avg,
+                drive_used_bytes_avg,
+                drive_total_bytes_avg
+            )
+            VALUES (
+                $machine_id,
+                $bucket_start,
+                1,
+                $cpu,
+                $ram_used,
+                $ram_total,
+                $drive_used,
+                $drive_total
+            )
+            ON CONFLICT (machine_id, bucket_start_utc) DO UPDATE SET
+                sample_count = machine_minute_cache.sample_count + 1,
+                cpu_percent_avg = ((machine_minute_cache.cpu_percent_avg * machine_minute_cache.sample_count) + EXCLUDED.cpu_percent_avg)
+                    / (machine_minute_cache.sample_count + 1),
+                ram_used_bytes_avg = ((machine_minute_cache.ram_used_bytes_avg * machine_minute_cache.sample_count) + EXCLUDED.ram_used_bytes_avg)
+                    / (machine_minute_cache.sample_count + 1),
+                ram_total_bytes_avg = ((machine_minute_cache.ram_total_bytes_avg * machine_minute_cache.sample_count) + EXCLUDED.ram_total_bytes_avg)
+                    / (machine_minute_cache.sample_count + 1),
+                drive_used_bytes_avg = ((machine_minute_cache.drive_used_bytes_avg * machine_minute_cache.sample_count) + EXCLUDED.drive_used_bytes_avg)
+                    / (machine_minute_cache.sample_count + 1),
+                drive_total_bytes_avg = ((machine_minute_cache.drive_total_bytes_avg * machine_minute_cache.sample_count) + EXCLUDED.drive_total_bytes_avg)
+                    / (machine_minute_cache.sample_count + 1);
+            """;
+        command.Parameters.AddWithValue("$machine_id", machineId);
+        command.Parameters.AddWithValue("$bucket_start", bucketStartUtc);
+        command.Parameters.AddWithValue("$cpu", machine.CpuPercent);
+        command.Parameters.AddWithValue("$ram_used", machine.RamUsedBytes);
+        command.Parameters.AddWithValue("$ram_total", machine.RamTotalBytes);
+        command.Parameters.AddWithValue("$drive_used", driveUsedBytes);
+        command.Parameters.AddWithValue("$drive_total", driveTotalBytes);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task InsertDrivesAsync(
@@ -243,6 +332,26 @@ public sealed class CollectorRepository
             ramParam.Value = process.RamBytes;
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
+    }
+
+    private static async Task<long?> GetLatestSampleIdAsync(
+        NpgsqlConnection connection,
+        string machineName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT ms.id
+            FROM machines m
+            JOIN machine_samples ms ON ms.machine_id = m.id
+            WHERE m.name = $name
+            ORDER BY ms.timestamp_utc DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$name", machineName);
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return result is null ? null : Convert.ToInt64(result);
     }
 
     private static async Task<IReadOnlyList<DriveSnapshotDto>> GetDrivesAsync(

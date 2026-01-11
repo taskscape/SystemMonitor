@@ -97,10 +97,24 @@ public sealed class DatabaseInitializer
                 ram_bytes BIGINT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS machine_minute_cache (
+                id BIGSERIAL PRIMARY KEY,
+                machine_id INTEGER NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+                bucket_start_utc TIMESTAMPTZ NOT NULL,
+                sample_count INTEGER NOT NULL,
+                cpu_percent_avg DOUBLE PRECISION NOT NULL,
+                ram_used_bytes_avg DOUBLE PRECISION NOT NULL,
+                ram_total_bytes_avg DOUBLE PRECISION NOT NULL,
+                drive_used_bytes_avg DOUBLE PRECISION NOT NULL,
+                drive_total_bytes_avg DOUBLE PRECISION NOT NULL,
+                UNIQUE (machine_id, bucket_start_utc)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_machine_samples_machine_time ON machine_samples(machine_id, timestamp_utc DESC);
             CREATE INDEX IF NOT EXISTS idx_machine_samples_time ON machine_samples(timestamp_utc);
             CREATE INDEX IF NOT EXISTS idx_drive_samples_machine_sample ON drive_samples(machine_sample_id);
             CREATE INDEX IF NOT EXISTS idx_process_samples_machine_sample ON process_samples(machine_sample_id);
+            CREATE INDEX IF NOT EXISTS idx_machine_minute_cache_machine_time ON machine_minute_cache(machine_id, bucket_start_utc DESC);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

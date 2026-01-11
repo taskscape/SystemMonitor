@@ -31,8 +31,8 @@ public sealed record MachineCurrentDto(
     string MachineName,
     DateTimeOffset TimestampUtc,
     double CpuPercent,
-    long RamUsedBytes,
-    long RamTotalBytes,
+    double RamUsedBytes,
+    double RamTotalBytes,
     IReadOnlyList<DriveSnapshotDto> Drives);
 
 public sealed record DriveSnapshotDto(
@@ -43,7 +43,7 @@ public sealed record DriveSnapshotDto(
 public sealed record HistoryPointDto(
     DateTimeOffset TimestampUtc,
     double CpuPercent,
-    long RamUsedBytes,
-    long RamTotalBytes,
-    long DriveUsedBytes,
-    long DriveTotalBytes);
+    double RamUsedBytes,
+    double RamTotalBytes,
+    double DriveUsedBytes,
+    double DriveTotalBytes);
