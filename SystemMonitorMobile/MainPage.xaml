@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="SystemMonitorMobile.MainPage"
+             Title="System Monitor">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+            <Label Text="System Collector" FontSize="24" FontAttributes="Bold" />
+            <Label Text="Fleet health from SystemCollectorService" FontSize="14" TextColor="#666666" />
+
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" ColumnSpacing="12">
+                <Picker Grid.Column="0"
+                        Title="Select machine"
+                        ItemsSource="{Binding Machines}"
+                        ItemDisplayBinding="{Binding MachineName}"
+                        SelectedItem="{Binding SelectedMachine}" />
+                <Button Grid.Column="1" Text="Refresh" Command="{Binding RefreshCommand}" />
+            </Grid>
+
+            <HorizontalStackLayout Spacing="10">
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding StatusMessage}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto" ColumnSpacing="12">
+                <Frame Grid.Column="0" Padding="12" CornerRadius="12">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="CPU" FontAttributes="Bold" />
+                        <Label Text="{Binding CpuPercent, StringFormat='{0:0.0}%'}" FontSize="20" />
+                    </VerticalStackLayout>
+                </Frame>
+                <Frame Grid.Column="1" Padding="12" CornerRadius="12">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="RAM" FontAttributes="Bold" />
+                        <Label Text="{Binding RamPercent, StringFormat='{0:0.0}%'}" FontSize="20" />
+                    </VerticalStackLayout>
+                </Frame>
+                <Frame Grid.Column="2" Padding="12" CornerRadius="12">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="HDD" FontAttributes="Bold" />
+                        <Label Text="{Binding DrivePercent, StringFormat='{0:0.0}%'}" FontSize="20" />
+                    </VerticalStackLayout>
+                </Frame>
+            </Grid>
+
+            <Frame Padding="12" CornerRadius="12">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Last Sample" FontAttributes="Bold" />
+                    <Label Text="{Binding LastSeen}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Label Text="Drives" FontAttributes="Bold" FontSize="18" />
+            <CollectionView ItemsSource="{Binding Drives}" IsVisible="{Binding HasDrives}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Frame Padding="10" CornerRadius="10" Margin="0,4">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label>
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="Used " />
+                                            <Span Text="{Binding UsedBytes, Converter={StaticResource BytesToStringConverter}}" />
+                                            <Span Text=" of " />
+                                            <Span Text="{Binding TotalBytes, Converter={StaticResource BytesToStringConverter}}" />
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                            </VerticalStackLayout>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Label Text="History (7 days)" FontAttributes="Bold" FontSize="18" />
+            <CollectionView ItemsSource="{Binding HistoryPoints}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Frame Padding="10" CornerRadius="10" Margin="0,4">
+                            <VerticalStackLayout Spacing="6">
+                                <Label Text="{Binding TimestampUtc, StringFormat='{0:u}'}" FontAttributes="Bold" />
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="{Binding CpuPercent, StringFormat='CPU {0:0.0}%'}" />
+                                    <Label Grid.Column="1" Text="{Binding RamPercent, StringFormat='RAM {0:0.0}%'}" />
+                                    <Label Grid.Column="2" Text="{Binding DrivePercent, StringFormat='HDD {0:0.0}%'}" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

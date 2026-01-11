@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemMonitorService", "Sys
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemCollectorService", "SystemCollectorService\SystemCollectorService.csproj", "{90A59361-16E7-4F76-9E99-EBA39EF577E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemMonitorMobile", "SystemMonitorMobile\SystemMonitorMobile.csproj", "{A13230EA-9D84-4C9C-9C51-89B7FC08E140}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{90A59361-16E7-4F76-9E99-EBA39EF577E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90A59361-16E7-4F76-9E99-EBA39EF577E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90A59361-16E7-4F76-9E99-EBA39EF577E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A13230EA-9D84-4C9C-9C51-89B7FC08E140}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A13230EA-9D84-4C9C-9C51-89B7FC08E140}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A13230EA-9D84-4C9C-9C51-89B7FC08E140}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A13230EA-9D84-4C9C-9C51-89B7FC08E140}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
