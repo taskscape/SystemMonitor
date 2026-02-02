@@ -42,8 +42,8 @@ public sealed class DatabaseInitializer
         await connection.OpenAsync(cancellationToken);
 
         await using var existsCommand = connection.CreateCommand();
-        existsCommand.CommandText = "SELECT 1 FROM pg_database WHERE datname = $name;";
-        existsCommand.Parameters.AddWithValue("$name", databaseName);
+        existsCommand.CommandText = "SELECT 1 FROM pg_database WHERE datname = @name;";
+        existsCommand.Parameters.AddWithValue("@name", databaseName);
 
         var exists = await existsCommand.ExecuteScalarAsync(cancellationToken) is not null;
         if (exists)

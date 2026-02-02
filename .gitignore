@@ -1,6 +1,29 @@
-﻿SystemCollectorService/obj
-SystemMonitorService/bin
-SystemMonitorService/obj
-SystemMonitorMobile/obj
-SystemCollectorService/bin
-SystemMonitorMobile/bin
+# .NET Core
+*.swp
+*.*~
+project.lock.json
+.DS_Store
+*.pyc
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Publish output (nasze foldery)
+publish_monitor/
+publish_collector/
+
+# Installers (nasze pliki exe w root)
+*Setup.exe
+*.exe
+
+# Logs
+*.log

@@ -80,11 +80,11 @@ public sealed class CollectorRepository
             SELECT m.name, c.bucket_start_utc, c.cpu_percent_avg, c.ram_used_bytes_avg, c.ram_total_bytes_avg
             FROM machines m
             JOIN machine_minute_cache c ON c.machine_id = m.id
-            WHERE m.name = $name
+            WHERE m.name = @name
             ORDER BY c.bucket_start_utc DESC
             LIMIT 1;
             """;
-        cacheCommand.Parameters.AddWithValue("$name", machineName);
+        cacheCommand.Parameters.AddWithValue("@name", machineName);
 
         await using var cacheReader = await cacheCommand.ExecuteReaderAsync(cancellationToken);
         if (!await cacheReader.ReadAsync(cancellationToken))
@@ -128,11 +128,11 @@ public sealed class CollectorRepository
                    c.drive_total_bytes_avg
             FROM machines m
             JOIN machine_minute_cache c ON c.machine_id = m.id
-            WHERE m.name = $name AND c.bucket_start_utc >= $cutoff
+            WHERE m.name = @name AND c.bucket_start_utc >= @cutoff
             ORDER BY c.bucket_start_utc;
             """;
-        command.Parameters.AddWithValue("$name", machineName);
-        command.Parameters.AddWithValue("$cutoff", cutoff);
+        command.Parameters.AddWithValue("@name", machineName);
+        command.Parameters.AddWithValue("@cutoff", cutoff);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -140,10 +140,10 @@ public sealed class CollectorRepository
             results.Add(new HistoryPointDto(
                 reader.GetFieldValue<DateTimeOffset>(0),
                 reader.GetDouble(1),
-                reader.GetInt64(2),
-                reader.GetInt64(3),
-                reader.GetInt64(4),
-                reader.GetInt64(5)));
+                (long)reader.GetDouble(2),
+                (long)reader.GetDouble(3),
+                (long)reader.GetDouble(4),
+                (long)reader.GetDouble(5)));
         }
 
         return results;
@@ -180,12 +180,12 @@ public sealed class CollectorRepository
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO machines (name, first_seen_utc, last_seen_utc)
-            VALUES ($name, $seen, $seen)
+            VALUES (@name, @seen, @seen)
             ON CONFLICT (name) DO UPDATE SET last_seen_utc = EXCLUDED.last_seen_utc
             RETURNING id;
             """;
-        command.Parameters.AddWithValue("$name", machineName);
-        command.Parameters.AddWithValue("$seen", lastSeenUtc);
+        command.Parameters.AddWithValue("@name", machineName);
+        command.Parameters.AddWithValue("@seen", lastSeenUtc);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(result);
@@ -204,14 +204,14 @@ public sealed class CollectorRepository
             INSERT INTO machine_samples
                 (machine_id, timestamp_utc, cpu_percent, ram_used_bytes, ram_total_bytes)
             VALUES
-                ($machine_id, $timestamp, $cpu, $ram_used, $ram_total)
+                (@machine_id, @timestamp, @cpu, @ram_used, @ram_total)
             RETURNING id;
             """;
-        command.Parameters.AddWithValue("$machine_id", machineId);
-        command.Parameters.AddWithValue("$timestamp", machine.TimestampUtc);
-        command.Parameters.AddWithValue("$cpu", machine.CpuPercent);
-        command.Parameters.AddWithValue("$ram_used", machine.RamUsedBytes);
-        command.Parameters.AddWithValue("$ram_total", machine.RamTotalBytes);
+        command.Parameters.AddWithValue("@machine_id", machineId);
+        command.Parameters.AddWithValue("@timestamp", machine.TimestampUtc);
+        command.Parameters.AddWithValue("@cpu", machine.CpuPercent);
+        command.Parameters.AddWithValue("@ram_used", machine.RamUsedBytes);
+        command.Parameters.AddWithValue("@ram_total", machine.RamTotalBytes);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt64(result);
@@ -241,14 +241,14 @@ public sealed class CollectorRepository
                 drive_total_bytes_avg
             )
             VALUES (
-                $machine_id,
-                $bucket_start,
+                @machine_id,
+                @bucket_start,
                 1,
-                $cpu,
-                $ram_used,
-                $ram_total,
-                $drive_used,
-                $drive_total
+                @cpu,
+                @ram_used,
+                @ram_total,
+                @drive_used,
+                @drive_total
             )
             ON CONFLICT (machine_id, bucket_start_utc) DO UPDATE SET
                 sample_count = machine_minute_cache.sample_count + 1,
@@ -263,13 +263,13 @@ public sealed class CollectorRepository
                 drive_total_bytes_avg = ((machine_minute_cache.drive_total_bytes_avg * machine_minute_cache.sample_count) + EXCLUDED.drive_total_bytes_avg)
                     / (machine_minute_cache.sample_count + 1);
             """;
-        command.Parameters.AddWithValue("$machine_id", machineId);
-        command.Parameters.AddWithValue("$bucket_start", bucketStartUtc);
-        command.Parameters.AddWithValue("$cpu", machine.CpuPercent);
-        command.Parameters.AddWithValue("$ram_used", machine.RamUsedBytes);
-        command.Parameters.AddWithValue("$ram_total", machine.RamTotalBytes);
-        command.Parameters.AddWithValue("$drive_used", driveUsedBytes);
-        command.Parameters.AddWithValue("$drive_total", driveTotalBytes);
+        command.Parameters.AddWithValue("@machine_id", machineId);
+        command.Parameters.AddWithValue("@bucket_start", bucketStartUtc);
+        command.Parameters.AddWithValue("@cpu", machine.CpuPercent);
+        command.Parameters.AddWithValue("@ram_used", machine.RamUsedBytes);
+        command.Parameters.AddWithValue("@ram_total", machine.RamTotalBytes);
+        command.Parameters.AddWithValue("@drive_used", driveUsedBytes);
+        command.Parameters.AddWithValue("@drive_total", driveTotalBytes);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -285,12 +285,12 @@ public sealed class CollectorRepository
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO drive_samples (machine_sample_id, name, total_bytes, used_bytes)
-            VALUES ($machine_id, $name, $total, $used);
+            VALUES (@machine_id, @name, @total, @used);
             """;
-        var machineParam = command.Parameters.Add("$machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var nameParam = command.Parameters.Add("$name", NpgsqlTypes.NpgsqlDbType.Text);
-        var totalParam = command.Parameters.Add("$total", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var usedParam = command.Parameters.Add("$used", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var machineParam = command.Parameters.Add("@machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var nameParam = command.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text);
+        var totalParam = command.Parameters.Add("@total", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var usedParam = command.Parameters.Add("@used", NpgsqlTypes.NpgsqlDbType.Bigint);
 
         foreach (var drive in drives)
         {
@@ -315,13 +315,13 @@ public sealed class CollectorRepository
             INSERT INTO process_samples
                 (machine_sample_id, process_id, process_name, cpu_percent, ram_bytes)
             VALUES
-                ($machine_id, $pid, $name, $cpu, $ram);
+                (@machine_id, @pid, @name, @cpu, @ram);
             """;
-        var machineParam = command.Parameters.Add("$machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var pidParam = command.Parameters.Add("$pid", NpgsqlTypes.NpgsqlDbType.Integer);
-        var nameParam = command.Parameters.Add("$name", NpgsqlTypes.NpgsqlDbType.Text);
-        var cpuParam = command.Parameters.Add("$cpu", NpgsqlTypes.NpgsqlDbType.Double);
-        var ramParam = command.Parameters.Add("$ram", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var machineParam = command.Parameters.Add("@machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var pidParam = command.Parameters.Add("@pid", NpgsqlTypes.NpgsqlDbType.Integer);
+        var nameParam = command.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text);
+        var cpuParam = command.Parameters.Add("@cpu", NpgsqlTypes.NpgsqlDbType.Double);
+        var ramParam = command.Parameters.Add("@ram", NpgsqlTypes.NpgsqlDbType.Bigint);
 
         foreach (var process in processes)
         {
@@ -344,11 +344,11 @@ public sealed class CollectorRepository
             SELECT ms.id
             FROM machines m
             JOIN machine_samples ms ON ms.machine_id = m.id
-            WHERE m.name = $name
+            WHERE m.name = @name
             ORDER BY ms.timestamp_utc DESC
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$name", machineName);
+        command.Parameters.AddWithValue("@name", machineName);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return result is null ? null : Convert.ToInt64(result);
@@ -364,9 +364,9 @@ public sealed class CollectorRepository
         command.CommandText = """
             SELECT name, total_bytes, used_bytes
             FROM drive_samples
-            WHERE machine_sample_id = $sample_id;
+            WHERE machine_sample_id = @sample_id;
             """;
-        command.Parameters.AddWithValue("$sample_id", machineSampleId);
+        command.Parameters.AddWithValue("@sample_id", machineSampleId);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
