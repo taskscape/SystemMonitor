@@ -1,97 +1,134 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:SystemMonitorMobile"
              x:Class="SystemMonitorMobile.MainPage"
-             Title="System Monitor">
+             Title="System Monitor"
+             BackgroundColor="{DynamicResource AppBackground}">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="16">
-            <Label Text="System Collector" FontSize="24" FontAttributes="Bold" />
-            <Label Text="Fleet health from SystemCollectorService" FontSize="14" TextColor="#666666" />
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <local:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
 
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto" ColumnSpacing="12">
-                <Picker Grid.Column="0"
-                        Title="Select machine"
-                        ItemsSource="{Binding Machines}"
-                        ItemDisplayBinding="{Binding MachineName}"
-                        SelectedItem="{Binding SelectedMachine}" />
-                <Button Grid.Column="1" Text="Refresh" Command="{Binding RefreshCommand}" />
-            </Grid>
+    <Grid>
+        <!-- SETUP SCREEN -->
+        <Grid RowDefinitions="*,Auto,*" IsVisible="{Binding IsConfigured, Converter={StaticResource InvertedBoolConverter}}" Padding="32" BackgroundColor="{DynamicResource AppBackground}">
+            <VerticalStackLayout Grid.Row="1" Spacing="24">
+                <Label Text="SYSTEM MONITOR" FontSize="14" FontAttributes="Bold" TextColor="{DynamicResource Accent}" CharacterSpacing="2" HorizontalOptions="Center" />
+                <Label Text="Server Setup" FontSize="32" FontAttributes="Bold" TextColor="{DynamicResource PrimaryText}" HorizontalOptions="Center" />
+                
+                <Label Text="Enter the URL of your SystemCollectorService." TextColor="{DynamicResource SecondaryText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
 
-            <HorizontalStackLayout Spacing="10">
-                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
-                <Label Text="{Binding StatusMessage}" VerticalOptions="Center" />
-            </HorizontalStackLayout>
+                <Entry Text="{Binding ServerUrlInput}" Placeholder="http://192.168.1.15:5100" BackgroundColor="White" TextColor="Black" HeightRequest="50" />
+                
+                <Button Text="Save &amp; Connect" Command="{Binding SaveConfigCommand}" BackgroundColor="{DynamicResource Accent}" TextColor="White" FontAttributes="Bold" CornerRadius="12" HeightRequest="50" />
+            </VerticalStackLayout>
+        </Grid>
 
-            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto" ColumnSpacing="12">
-                <Frame Grid.Column="0" Padding="12" CornerRadius="12">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="CPU" FontAttributes="Bold" />
-                        <Label Text="{Binding CpuPercent, StringFormat='{0:0.0}%'}" FontSize="20" />
-                    </VerticalStackLayout>
-                </Frame>
-                <Frame Grid.Column="1" Padding="12" CornerRadius="12">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="RAM" FontAttributes="Bold" />
-                        <Label Text="{Binding RamPercent, StringFormat='{0:0.0}%'}" FontSize="20" />
-                    </VerticalStackLayout>
-                </Frame>
-                <Frame Grid.Column="2" Padding="12" CornerRadius="12">
-                    <VerticalStackLayout Spacing="6">
-                        <Label Text="HDD" FontAttributes="Bold" />
-                        <Label Text="{Binding DrivePercent, StringFormat='{0:0.0}%'}" FontSize="20" />
-                    </VerticalStackLayout>
-                </Frame>
-            </Grid>
-
-            <Frame Padding="12" CornerRadius="12">
-                <VerticalStackLayout Spacing="6">
-                    <Label Text="Last Sample" FontAttributes="Bold" />
-                    <Label Text="{Binding LastSeen}" />
+        <!-- DASHBOARD SCREEN -->
+        <Grid RowDefinitions="Auto,*" IsVisible="{Binding IsConfigured}">
+            <!-- Header & Controls (Fixed top) -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="24" BackgroundColor="{DynamicResource AppBackground}">
+                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                    <Label Text="SYSTEM MONITOR" FontSize="12" FontAttributes="Bold" TextColor="{DynamicResource Accent}" CharacterSpacing="2" />
+                    <Label Text="{Binding StatusMessage}" TextColor="{DynamicResource SecondaryText}" FontSize="12" />
                 </VerticalStackLayout>
-            </Frame>
+                <!-- Opcjonalnie tutaj przycisk settings -->
+            </Grid>
 
-            <Label Text="Drives" FontAttributes="Bold" FontSize="18" />
-            <CollectionView ItemsSource="{Binding Drives}" IsVisible="{Binding HasDrives}">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <Frame Padding="10" CornerRadius="10" Margin="0,4">
+            <!-- Scrollable Content -->
+            <ScrollView Grid.Row="1">
+                <VerticalStackLayout Padding="24" Spacing="24">
+                    
+                    <!-- Machine Selector -->
+                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Picker Grid.Column="0" Title="Select machine" ItemsSource="{Binding Machines}" ItemDisplayBinding="{Binding MachineName}" SelectedItem="{Binding SelectedMachine}" TextColor="{DynamicResource PrimaryText}" />
+                            <Button Grid.Column="1" Text="Refresh" Command="{Binding RefreshCommand}" BackgroundColor="{DynamicResource Accent}" TextColor="White" HeightRequest="36" CornerRadius="8" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Current Stats -->
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                        <Border Grid.Column="0" StrokeShape="RoundRectangle 16" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="16">
                             <VerticalStackLayout Spacing="4">
-                                <Label Text="{Binding Name}" FontAttributes="Bold" />
-                                <Label>
-                                    <Label.FormattedText>
-                                        <FormattedString>
-                                            <Span Text="Used " />
-                                            <Span Text="{Binding UsedBytes, Converter={StaticResource BytesToStringConverter}}" />
-                                            <Span Text=" of " />
-                                            <Span Text="{Binding TotalBytes, Converter={StaticResource BytesToStringConverter}}" />
-                                        </FormattedString>
-                                    </Label.FormattedText>
-                                </Label>
+                                <Label Text="CPU" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
+                                <Label Text="{Binding CpuPercent, StringFormat='{0:0}%'}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource AccentCpu}" />
                             </VerticalStackLayout>
-                        </Frame>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                        </Border>
+                        <Border Grid.Column="1" StrokeShape="RoundRectangle 16" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="16">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="RAM" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
+                                <Label Text="{Binding RamPercent, StringFormat='{0:0}%'}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource AccentRam}" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <Border Grid.Column="2" StrokeShape="RoundRectangle 16" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="16">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="HDD" FontSize="12" TextColor="{DynamicResource SecondaryText}" />
+                                <Label Text="{Binding DrivePercent, StringFormat='{0:0}%'}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource AccentDisk}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
 
-            <Label Text="History (7 days)" FontAttributes="Bold" FontSize="18" />
-            <CollectionView ItemsSource="{Binding HistoryPoints}">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate>
-                        <Frame Padding="10" CornerRadius="10" Margin="0,4">
-                            <VerticalStackLayout Spacing="6">
-                                <Label Text="{Binding TimestampUtc, StringFormat='{0:u}'}" FontAttributes="Bold" />
-                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                                    <Label Grid.Column="0" Text="{Binding CpuPercent, StringFormat='CPU {0:0.0}%'}" />
-                                    <Label Grid.Column="1" Text="{Binding RamPercent, StringFormat='RAM {0:0.0}%'}" />
-                                    <Label Grid.Column="2" Text="{Binding DrivePercent, StringFormat='HDD {0:0.0}%'}" />
+                    <Label Text="{Binding LastSeen, StringFormat='Last seen: {0}'}" HorizontalOptions="Center" TextColor="{DynamicResource SecondaryText}" FontSize="12" />
+
+                    <!-- Trend Chart -->
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Performance Trend (7 days)" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource PrimaryText}" />
+                        <Border StrokeShape="RoundRectangle 16" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="16" HeightRequest="160">
+                            <Grid RowDefinitions="*,Auto" RowSpacing="10">
+                                <!-- Graph lines -->
+                                <Grid Grid.Row="0">
+                                    <BoxView HeightRequest="1" Color="{DynamicResource Gray200}" VerticalOptions="Start" Opacity="0.3" />
+                                    <BoxView HeightRequest="1" Color="{DynamicResource Gray200}" VerticalOptions="Center" Opacity="0.3" />
+                                    <BoxView HeightRequest="1" Color="{DynamicResource Gray200}" VerticalOptions="End" Opacity="0.3" />
+                                    
+                                    <Polyline Points="{Binding DriveChartPoints}" Stroke="{DynamicResource AccentDisk}" StrokeThickness="2" Aspect="Fill" />
+                                    <Polyline Points="{Binding RamChartPoints}" Stroke="{DynamicResource AccentRam}" StrokeThickness="2" Aspect="Fill" />
+                                    <Polyline Points="{Binding CpuChartPoints}" Stroke="{DynamicResource AccentCpu}" StrokeThickness="2" Aspect="Fill" />
                                 </Grid>
-                            </VerticalStackLayout>
-                        </Frame>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </VerticalStackLayout>
-    </ScrollView>
+                                <!-- Legend -->
+                                <HorizontalStackLayout Grid.Row="1" Spacing="16" HorizontalOptions="Center">
+                                    <HorizontalStackLayout Spacing="4"><BoxView Color="{DynamicResource AccentCpu}" WidthRequest="8" HeightRequest="8" CornerRadius="4" /><Label Text="CPU" FontSize="10" /></HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="4"><BoxView Color="{DynamicResource AccentRam}" WidthRequest="8" HeightRequest="8" CornerRadius="4" /><Label Text="RAM" FontSize="10" /></HorizontalStackLayout>
+                                    <HorizontalStackLayout Spacing="4"><BoxView Color="{DynamicResource AccentDisk}" WidthRequest="8" HeightRequest="8" CornerRadius="4" /><Label Text="HDD" FontSize="10" /></HorizontalStackLayout>
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </Border>
+                    </VerticalStackLayout>
 
+                    <!-- Storage -->
+                    <VerticalStackLayout Spacing="10" IsVisible="{Binding HasDrives}">
+                        <Label Text="Storage Details" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource PrimaryText}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Drives}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Border StrokeShape="RoundRectangle 12" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="12">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <VerticalStackLayout Grid.Column="0">
+                                                <Label Text="{Binding Name}" FontAttributes="Bold" TextColor="{DynamicResource PrimaryText}" />
+                                                <Label TextColor="{DynamicResource SecondaryText}" FontSize="12">
+                                                    <Label.FormattedText>
+                                                        <FormattedString>
+                                                            <Span Text="{Binding UsedBytes, Converter={StaticResource BytesToStringConverter}}" />
+                                                            <Span Text=" / " />
+                                                            <Span Text="{Binding TotalBytes, Converter={StaticResource BytesToStringConverter}}" />
+                                                        </FormattedString>
+                                                    </Label.FormattedText>
+                                                </Label>
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="1" Text="Fixed" FontSize="10" TextColor="{DynamicResource AccentDisk}" VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+    </Grid>
 </ContentPage>

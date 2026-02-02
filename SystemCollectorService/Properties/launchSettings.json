@@ -2,11 +2,11 @@
   "profiles": {
     "SystemCollectorService": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:52000;http://localhost:52001"
+      "applicationUrl": "http://0.0.0.0:5100"
     }
   }
 }
