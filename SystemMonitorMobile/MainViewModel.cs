@@ -1,11 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Microsoft.Maui.Controls.Shapes; // Dla PointCollection
+using Point = Microsoft.Maui.Graphics.Point; // Dla Point
 
 namespace SystemMonitorMobile;
 
 public sealed class MainViewModel : BindableBase
 {
     private readonly CollectorApiClient _apiClient;
+    private readonly CollectorSettings _settings; // Dodane
+    
     private bool _isBusy;
     private string _statusMessage = "Idle";
     private MachineSummaryDto? _selectedMachine;
@@ -13,23 +17,54 @@ public sealed class MainViewModel : BindableBase
     private double _ramPercent;
     private double _drivePercent;
     private string _lastSeen = "--";
-    private IReadOnlyList<DriveDisplay> _drives = Array.Empty<DriveDisplay>();
+    
+    // Nowe pola dla konfiguracji
+    private bool _isConfigured;
+    private string _serverUrlInput = string.Empty;
+
+    public ObservableCollection<DriveDisplay> Drives { get; } = new();
+    
+    private PointCollection _cpuChartPoints = new();
+    private PointCollection _ramChartPoints = new();
+    private PointCollection _driveChartPoints = new();
 
     public ObservableCollection<MachineSummaryDto> Machines { get; } = new();
-    public ObservableCollection<HistoryDisplayPoint> HistoryPoints { get; } = new();
 
-    public MainViewModel(CollectorApiClient apiClient)
+    // Konstruktor
+    public MainViewModel(CollectorApiClient apiClient, CollectorSettings settings)
     {
         _apiClient = apiClient;
+        _settings = settings;
+        
+        // Inicjalizacja pola tekstowego obecną wartością
+        ServerUrlInput = _settings.BaseUrl;
+        
         RefreshCommand = new Command(async () => await RefreshAsync());
+        SaveConfigCommand = new Command(SaveConfig);
+        
+        // Domyślnie pokazujemy ekran konfiguracji przy starcie, aby użytkownik mógł wpisać adres
+        IsConfigured = false; 
     }
 
     public ICommand RefreshCommand { get; }
+    public ICommand SaveConfigCommand { get; }
 
     public bool IsBusy
     {
         get => _isBusy;
         set => SetProperty(ref _isBusy, value);
+    }
+
+    public bool IsConfigured
+    {
+        get => _isConfigured;
+        set => SetProperty(ref _isConfigured, value);
+    }
+
+    public string ServerUrlInput
+    {
+        get => _serverUrlInput;
+        set => SetProperty(ref _serverUrlInput, value);
     }
 
     public string StatusMessage
@@ -74,21 +109,53 @@ public sealed class MainViewModel : BindableBase
         set => SetProperty(ref _lastSeen, value);
     }
 
-    public IReadOnlyList<DriveDisplay> Drives
+    private bool _hasDrives;
+    public bool HasDrives
     {
-        get => _drives;
-        set
-        {
-            SetProperty(ref _drives, value);
-            RaisePropertyChanged(nameof(HasDrives));
-        }
+        get => _hasDrives;
+        set => SetProperty(ref _hasDrives, value);
     }
 
-    public bool HasDrives => Drives.Count > 0;
+    public PointCollection CpuChartPoints
+    {
+        get => _cpuChartPoints;
+        set => SetProperty(ref _cpuChartPoints, value);
+    }
+
+    public PointCollection RamChartPoints
+    {
+        get => _ramChartPoints;
+        set => SetProperty(ref _ramChartPoints, value);
+    }
+
+    public PointCollection DriveChartPoints
+    {
+        get => _driveChartPoints;
+        set => SetProperty(ref _driveChartPoints, value);
+    }
 
     public async Task InitializeAsync()
     {
         await RefreshAsync();
+    }
+
+    private void SaveConfig()
+    {
+        if (string.IsNullOrWhiteSpace(ServerUrlInput)) return;
+        
+        // Zapisz do preferences
+        _settings.BaseUrl = ServerUrlInput;
+        
+        // Przełącz widok i odśwież
+        IsConfigured = true;
+        _ = RefreshAsync();
+    }
+    
+    // Metoda do wywołania z UI, żeby wejść w tryb edycji
+    public void EnterConfigMode()
+    {
+        IsConfigured = false;
+        ServerUrlInput = _settings.BaseUrl;
     }
 
     private bool SetSelectedMachine(MachineSummaryDto? value)
@@ -105,35 +172,45 @@ public sealed class MainViewModel : BindableBase
 
     public async Task RefreshAsync()
     {
-        if (IsBusy)
-        {
-            return;
-        }
+        if (IsBusy) return;
 
         try
         {
             IsBusy = true;
-            StatusMessage = "Syncing";
+            StatusMessage = "Syncing...";
+
+            var previousSelectionName = SelectedMachine?.MachineName;
 
             var machines = await _apiClient.GetMachinesAsync(CancellationToken.None);
+            
             Machines.Clear();
             foreach (var machine in machines)
             {
                 Machines.Add(machine);
             }
 
-            SelectedMachine = Machines.Count > 0 ? Machines[0] : null;
-            if (SelectedMachine is null)
+            if (!string.IsNullOrEmpty(previousSelectionName))
             {
-                ResetDashboard();
+                var match = Machines.FirstOrDefault(m => m.MachineName == previousSelectionName);
+                if (match != null) SelectedMachine = match;
+                else SelectedMachine = Machines.FirstOrDefault();
+            }
+            else
+            {
+                if (SelectedMachine == null && Machines.Count > 0)
+                {
+                    SelectedMachine = Machines[0];
+                }
             }
 
-            StatusMessage = "Ready";
+            if (SelectedMachine == null) StatusMessage = "No machines found";
+            else StatusMessage = "Ready";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            StatusMessage = "Offline";
-            ResetDashboard();
+            StatusMessage = $"Err: {ex.Message}";
+            // Jeśli błąd sieci, to może użytkownik ma zły adres?
+            // Opcjonalnie: EnterConfigMode(); // Ale to może być irytujące.
         }
         finally
         {
@@ -143,15 +220,11 @@ public sealed class MainViewModel : BindableBase
 
     private async Task LoadSelectionAsync()
     {
-        if (SelectedMachine is null)
-        {
-            ResetDashboard();
-            return;
-        }
+        if (SelectedMachine is null) return;
 
         try
         {
-            StatusMessage = "Loading";
+            StatusMessage = "Loading...";
 
             var currentTask = _apiClient.GetCurrentAsync(SelectedMachine.MachineName, CancellationToken.None);
             var historyTask = _apiClient.GetHistoryAsync(SelectedMachine.MachineName, 7, CancellationToken.None);
@@ -162,65 +235,91 @@ public sealed class MainViewModel : BindableBase
 
             if (current is null)
             {
-                ResetDashboard();
                 StatusMessage = "No data";
                 return;
             }
 
-            CpuPercent = current.CpuPercent;
-            RamPercent = Percent(current.RamUsedBytes, current.RamTotalBytes);
-
             var driveTotals = current.Drives.Aggregate(
                 (used: 0d, total: 0d),
                 (acc, drive) => (acc.used + drive.UsedBytes, acc.total + drive.TotalBytes));
-            DrivePercent = Percent(driveTotals.used, driveTotals.total);
-            LastSeen = current.TimestampUtc.ToString("u");
+            
+            var cpuPoints = new PointCollection();
+            var ramPoints = new PointCollection();
+            var hddPoints = new PointCollection();
 
-            Drives = current.Drives.Select(drive => new DriveDisplay
+            if (history.Count > 1)
             {
-                Name = drive.Name,
-                UsedBytes = drive.UsedBytes,
-                TotalBytes = drive.TotalBytes
-            }).ToList();
+                double width = 350;
+                double height = 100;
+                double stepX = width / (history.Count - 1);
 
-            HistoryPoints.Clear();
-            foreach (var point in history)
-            {
-                HistoryPoints.Add(new HistoryDisplayPoint
+                for (int i = 0; i < history.Count; i++)
                 {
-                    TimestampUtc = point.TimestampUtc,
-                    CpuPercent = point.CpuPercent,
-                    RamPercent = Percent(point.RamUsedBytes, point.RamTotalBytes),
-                    DrivePercent = Percent(point.DriveUsedBytes, point.DriveTotalBytes)
-                });
+                    var pt = history[i];
+                    double x = i * stepX;
+                    
+                    double cpuY = height - (pt.CpuPercent / 100.0 * height);
+                    if (double.IsNaN(cpuY) || double.IsInfinity(cpuY)) cpuY = height;
+                    cpuPoints.Add(new Point(x, Math.Clamp(cpuY, 0, height)));
+                    
+                    double ramP = Percent(pt.RamUsedBytes, pt.RamTotalBytes);
+                    double ramY = height - (ramP / 100.0 * height);
+                    if (double.IsNaN(ramY) || double.IsInfinity(ramY)) ramY = height;
+                    ramPoints.Add(new Point(x, Math.Clamp(ramY, 0, height)));
+
+                    double hddP = Percent(pt.DriveUsedBytes, pt.DriveTotalBytes);
+                    double hddY = height - (hddP / 100.0 * height);
+                    if (double.IsNaN(hddY) || double.IsInfinity(hddY)) hddY = height;
+                    hddPoints.Add(new Point(x, Math.Clamp(hddY, 0, height)));
+                }
+            }
+            else
+            {
+                var p0 = new Point(0, 100);
+                var p1 = new Point(350, 100);
+                cpuPoints.Add(p0); cpuPoints.Add(p1);
+                ramPoints.Add(p0); ramPoints.Add(p1);
+                hddPoints.Add(p0); hddPoints.Add(p1);
             }
 
-            StatusMessage = "Ready";
-        }
-        catch (Exception)
-        {
-            StatusMessage = "Unavailable";
-            ResetDashboard();
-        }
-    }
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                CpuPercent = current.CpuPercent;
+                RamPercent = Percent(current.RamUsedBytes, current.RamTotalBytes);
+                DrivePercent = Percent(driveTotals.used, driveTotals.total);
+                
+                LastSeen = current.TimestampUtc.ToLocalTime().ToString("g");
 
-    private void ResetDashboard()
-    {
-        CpuPercent = 0;
-        RamPercent = 0;
-        DrivePercent = 0;
-        LastSeen = "--";
-        Drives = Array.Empty<DriveDisplay>();
-        HistoryPoints.Clear();
+                Drives.Clear();
+                foreach(var d in current.Drives)
+                {
+                    Drives.Add(new DriveDisplay 
+                    { 
+                        Name = d.Name, 
+                        UsedBytes = d.UsedBytes, 
+                        TotalBytes = d.TotalBytes 
+                    });
+                }
+                HasDrives = Drives.Count > 0;
+
+                CpuChartPoints = cpuPoints;
+                RamChartPoints = ramPoints;
+                DriveChartPoints = hddPoints;
+
+                var timeDiff = DateTimeOffset.UtcNow - current.TimestampUtc;
+                if (timeDiff.TotalMinutes > 2) StatusMessage = "Offline";
+                else StatusMessage = "Online";
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Err: {ex.Message}";
+        }
     }
 
     private static double Percent(double used, double total)
     {
-        if (total <= 0)
-        {
-            return 0;
-        }
-
+        if (total <= 0) return 0;
         return used / total * 100d;
     }
 }

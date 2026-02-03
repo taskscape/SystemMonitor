@@ -21,22 +21,12 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        try
-        {
-            using var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json")
-                .GetAwaiter()
-                .GetResult();
-            builder.Configuration.AddJsonStream(stream);
-        }
-        catch (Exception)
-        {
-            // Optional configuration file.
-        }
-
-        var settings = new CollectorSettings();
-        builder.Configuration.Bind(nameof(CollectorSettings), settings);
-        builder.Services.AddSingleton(settings);
-        builder.Services.AddHttpClient<CollectorApiClient>();
+        builder.Services.AddSingleton<CollectorSettings>();
+        
+        // Rejestracja HTTP Clienta
+        builder.Services.AddSingleton(sp => new HttpClient());
+        builder.Services.AddSingleton<CollectorApiClient>();
+        
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainPage>();
 

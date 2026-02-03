@@ -132,6 +132,7 @@ public sealed class SqliteStorage
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
 
+        // 1. Get pending machine samples
         var selectMachines = connection.CreateCommand();
         selectMachines.CommandText = """
             SELECT id, timestamp_utc, cpu_percent, ram_used_bytes, ram_total_bytes
@@ -144,12 +145,16 @@ public sealed class SqliteStorage
         selectMachines.Parameters.AddWithValue("$limit", batchSize);
 
         var machineRows = new List<MachineSampleRecord>();
+        var machineIds = new List<long>();
+
         await using (var reader = await selectMachines.ExecuteReaderAsync(cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
             {
+                var id = reader.GetInt64(0);
+                machineIds.Add(id);
                 machineRows.Add(new MachineSampleRecord(
-                    reader.GetInt64(0),
+                    id,
                     DateTimeOffset.Parse(reader.GetString(1)),
                     reader.GetDouble(2),
                     reader.GetInt64(3),
@@ -157,10 +162,63 @@ public sealed class SqliteStorage
             }
         }
 
+        if (machineRows.Count == 0)
+        {
+            return results;
+        }
+
+        // 2. Bulk fetch drives and processes for these machines
+        var idList = string.Join(",", machineIds);
+        
+        var drivesMap = new Dictionary<long, List<DriveSampleRecord>>();
+        var selectDrives = connection.CreateCommand();
+        selectDrives.CommandText = $"""
+            SELECT machine_sample_id, name, total_bytes, used_bytes
+            FROM drive_samples
+            WHERE machine_sample_id IN ({idList});
+            """;
+        
+        await using (var reader = await selectDrives.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var mId = reader.GetInt64(0);
+                if (!drivesMap.TryGetValue(mId, out var list))
+                {
+                    list = new List<DriveSampleRecord>();
+                    drivesMap[mId] = list;
+                }
+                list.Add(new DriveSampleRecord(0, mId, reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3)));
+            }
+        }
+
+        var processesMap = new Dictionary<long, List<ProcessSampleRecord>>();
+        var selectProcesses = connection.CreateCommand();
+        selectProcesses.CommandText = $"""
+            SELECT machine_sample_id, process_id, process_name, cpu_percent, ram_bytes
+            FROM process_samples
+            WHERE machine_sample_id IN ({idList});
+            """;
+
+        await using (var reader = await selectProcesses.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var mId = reader.GetInt64(0);
+                if (!processesMap.TryGetValue(mId, out var list))
+                {
+                    list = new List<ProcessSampleRecord>();
+                    processesMap[mId] = list;
+                }
+                list.Add(new ProcessSampleRecord(0, mId, reader.GetInt32(1), reader.GetString(2), reader.GetDouble(3), reader.GetInt64(4)));
+            }
+        }
+
+        // 3. Assemble results
         foreach (var machine in machineRows)
         {
-            var drives = await GetDrivesAsync(connection, machine.Id, cancellationToken);
-            var processes = await GetProcessesAsync(connection, machine.Id, cancellationToken);
+            var drives = drivesMap.TryGetValue(machine.Id, out var d) ? d : new List<DriveSampleRecord>();
+            var processes = processesMap.TryGetValue(machine.Id, out var p) ? p : new List<ProcessSampleRecord>();
             results.Add(new SampleEnvelope(machine, drives, processes));
         }
 
@@ -179,20 +237,16 @@ public sealed class SqliteStorage
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         var idList = string.Join(",", machineSampleIds);
-        var deleteProcesses = connection.CreateCommand();
-        deleteProcesses.CommandText = $"DELETE FROM process_samples WHERE machine_sample_id IN ({idList});";
-        deleteProcesses.Transaction = transaction;
-        await deleteProcesses.ExecuteNonQueryAsync(cancellationToken);
-
-        var deleteDrives = connection.CreateCommand();
-        deleteDrives.CommandText = $"DELETE FROM drive_samples WHERE machine_sample_id IN ({idList});";
-        deleteDrives.Transaction = transaction;
-        await deleteDrives.ExecuteNonQueryAsync(cancellationToken);
-
-        var deleteMachines = connection.CreateCommand();
-        deleteMachines.CommandText = $"DELETE FROM machine_samples WHERE id IN ({idList});";
-        deleteMachines.Transaction = transaction;
-        await deleteMachines.ExecuteNonQueryAsync(cancellationToken);
+        
+        // Don't DELETE. Update pending_push to 0 (false) to keep history.
+        var update = connection.CreateCommand();
+        update.CommandText = $"""
+            UPDATE machine_samples
+            SET pending_push = 0
+            WHERE id IN ({idList});
+            """;
+        update.Transaction = transaction;
+        await update.ExecuteNonQueryAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
     }

@@ -1,74 +1,50 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 
 namespace SystemMonitorMobile;
 
 public sealed class CollectorSettings
 {
-    public string BaseUrl { get; set; } = "http://localhost:5100";
+    private const string Key = "server_url";
+    private const string DefaultUrl = "http://10.0.2.2:5100";
+
+    public string BaseUrl
+    {
+        get => Preferences.Get(Key, DefaultUrl);
+        set => Preferences.Set(Key, value);
+    }
 }
 
 public sealed class MachineSummaryDto
 {
-    [JsonPropertyName("machineName")]
     public string MachineName { get; set; } = string.Empty;
-
-    [JsonPropertyName("lastSeenUtc")]
     public DateTimeOffset LastSeenUtc { get; set; }
 }
 
 public sealed class MachineCurrentDto
 {
-    [JsonPropertyName("machineName")]
     public string MachineName { get; set; } = string.Empty;
-
-    [JsonPropertyName("timestampUtc")]
     public DateTimeOffset TimestampUtc { get; set; }
-
-    [JsonPropertyName("cpuPercent")]
     public double CpuPercent { get; set; }
-
-    [JsonPropertyName("ramUsedBytes")]
     public double RamUsedBytes { get; set; }
-
-    [JsonPropertyName("ramTotalBytes")]
     public double RamTotalBytes { get; set; }
-
-    [JsonPropertyName("drives")]
     public List<DriveSnapshotDto> Drives { get; set; } = new();
 }
 
 public sealed class DriveSnapshotDto
 {
-    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
-
-    [JsonPropertyName("totalBytes")]
     public double TotalBytes { get; set; }
-
-    [JsonPropertyName("usedBytes")]
     public double UsedBytes { get; set; }
 }
 
 public sealed class HistoryPointDto
 {
-    [JsonPropertyName("timestampUtc")]
     public DateTimeOffset TimestampUtc { get; set; }
-
-    [JsonPropertyName("cpuPercent")]
     public double CpuPercent { get; set; }
-
-    [JsonPropertyName("ramUsedBytes")]
     public double RamUsedBytes { get; set; }
-
-    [JsonPropertyName("ramTotalBytes")]
     public double RamTotalBytes { get; set; }
-
-    [JsonPropertyName("driveUsedBytes")]
     public double DriveUsedBytes { get; set; }
-
-    [JsonPropertyName("driveTotalBytes")]
     public double DriveTotalBytes { get; set; }
 }
 
