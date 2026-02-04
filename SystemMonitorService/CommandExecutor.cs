@@ -55,10 +55,10 @@ public sealed class CommandExecutor
 
             if (command.CommandType.Equals("restart", StringComparison.OrdinalIgnoreCase))
             {
-                // Najpierw informujemy serwer, że przyjęliśmy rozkaz
+                // First inform the server that we accepted the command
                 await UpdateStatusAsync(command.Id, "completed", "Restart initiated", cancellationToken);
                 
-                // Potem restartujemy z lekkim opóźnieniem, aby request HTTP zdążył wyjść
+                // Then restart with a slight delay so the HTTP request has time to go out
                 RestartSystem();
             }
             else
@@ -69,7 +69,7 @@ public sealed class CommandExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to execute command {Id}", command.Id);
-            // Tu może rzucić wyjątek, jeśli sieć już padła, ale próbujemy
+            // This might throw an exception if the network is already down, but we try anyway
             try { await UpdateStatusAsync(command.Id, "failed", ex.Message, cancellationToken); } catch { }
         }
     }
@@ -86,7 +86,7 @@ public sealed class CommandExecutor
     {
         _logger.LogWarning("SYSTEM RESTART INITIATED BY REMOTE COMMAND");
         
-        // /t 5 - czekaj 5 sekund (daje czas na flush logów i zamknięcie połączeń HTTP)
+        // /t 5 - wait 5 seconds (gives time for log flush and closing HTTP connections)
         var psi = new ProcessStartInfo("shutdown", "/r /t 5 /f")
         {
             CreateNoWindow = true,

@@ -14,8 +14,7 @@ builder.Services.AddSingleton<SqliteStorage>();
 
 
 
-// Wspólna konfiguracja Handlera HTTP (SSL Bypass)
-
+// Common HTTP Handler configuration (SSL Bypass)
 Func<IServiceProvider, HttpMessageHandler> configureHandler = sp =>
 
 {

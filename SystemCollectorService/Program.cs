@@ -78,7 +78,7 @@ app.MapGet("/api/v1/machines/{machineName}/history", async (
     return history.Count == 0 ? Results.NotFound() : Results.Ok(history);
 });
 
-// Endpointy dla komend
+// Endpoints for commands
 app.MapPost("/api/v1/machines/{machineName}/commands", async (
     string machineName,
     CommandRequestDto request,

@@ -1,14 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using Microsoft.Maui.Controls.Shapes; // Dla PointCollection
-using Point = Microsoft.Maui.Graphics.Point; // Dla Point
+using Microsoft.Maui.Controls.Shapes; // For PointCollection
+using Point = Microsoft.Maui.Graphics.Point; // For Point
 
 namespace SystemMonitorMobile;
 
 public sealed class MainViewModel : BindableBase
 {
     private readonly CollectorApiClient _apiClient;
-    private readonly CollectorSettings _settings; // Dodane
+    private readonly CollectorSettings _settings; // Added
     
     private bool _isBusy;
     private string _statusMessage = "Idle";
@@ -18,7 +18,7 @@ public sealed class MainViewModel : BindableBase
     private double _drivePercent;
     private string _lastSeen = "--";
     
-    // Nowe pola dla konfiguracji
+    // New fields for configuration
     private bool _isConfigured;
     private string _serverUrlInput = string.Empty;
 
@@ -30,20 +30,20 @@ public sealed class MainViewModel : BindableBase
 
     public ObservableCollection<MachineSummaryDto> Machines { get; } = new();
 
-    // Konstruktor
+    // Constructor
     public MainViewModel(CollectorApiClient apiClient, CollectorSettings settings)
     {
         _apiClient = apiClient;
         _settings = settings;
         
-        // Inicjalizacja pola tekstowego obecną wartością
+        // Initialize text field with current value
         ServerUrlInput = _settings.BaseUrl;
         
         RefreshCommand = new Command(async () => await RefreshAsync());
         SaveConfigCommand = new Command(SaveConfig);
         RestartCommand = new Command(async () => await RestartAsync());
         
-        // Domyślnie pokazujemy ekran konfiguracji przy starcie, aby użytkownik mógł wpisać adres
+        // Default to configuration screen on start so user can enter address
         IsConfigured = false; 
     }
 
@@ -145,15 +145,15 @@ public sealed class MainViewModel : BindableBase
     {
         if (string.IsNullOrWhiteSpace(ServerUrlInput)) return;
         
-        // Zapisz do preferences
+        // Save to preferences
         _settings.BaseUrl = ServerUrlInput;
         
-        // Przełącz widok i odśwież
+        // Toggle view and refresh
         IsConfigured = true;
         _ = RefreshAsync();
     }
     
-    // Metoda do wywołania z UI, żeby wejść w tryb edycji
+    // Method to be called from UI to enter configuration mode
     public void EnterConfigMode()
     {
         IsConfigured = false;
@@ -211,8 +211,8 @@ public sealed class MainViewModel : BindableBase
         catch (Exception ex)
         {
             StatusMessage = $"Err: {ex.Message}";
-            // Jeśli błąd sieci, to może użytkownik ma zły adres?
-            // Opcjonalnie: EnterConfigMode(); // Ale to może być irytujące.
+            // If network error, maybe user has wrong address?
+            // Optional: EnterConfigMode(); // But this might be annoying.
         }
         finally
         {

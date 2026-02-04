@@ -42,7 +42,7 @@ public sealed class Worker : BackgroundService
 
     private async Task CommandLoopAsync(CancellationToken stoppingToken)
     {
-        // Sprawdzaj komendy co 3 sekundy dla szybszej reakcji
+        // Check commands every 3 seconds for faster reaction
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
 
         while (await timer.WaitForNextTickAsync(stoppingToken))

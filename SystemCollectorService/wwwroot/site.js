@@ -12,16 +12,16 @@ const cpuChart = document.getElementById('cpuChart');
 const ramChart = document.getElementById('ramChart');
 const diskChart = document.getElementById('diskChart');
 
-// Przechowujemy dane wykresów dla obsługi hover
+// Store chart data for hover handling
 const chartsData = new Map();
 
-// Inicjalizacja interakcji na wykresach
+// Initialize chart interactions
 [cpuChart, ramChart, diskChart].forEach(canvas => {
   canvas.addEventListener('mousemove', (e) => handleChartHover(e, canvas));
   canvas.addEventListener('mouseleave', () => {
     const data = chartsData.get(canvas);
     if (data) {
-      // Przerysuj czysty wykres bez podświetlenia
+      // Redraw clean chart without highlight
       renderChart(canvas, data.points, { color: data.color });
     }
   });
@@ -32,23 +32,23 @@ function handleChartHover(e, canvas) {
   if (!data || data.points.length < 2) return;
 
   const rect = canvas.getBoundingClientRect();
-  // Skalowanie współrzędnych myszy do wewnętrznej rozdzielczości canvas
+  // Scale mouse coordinates to canvas internal resolution
   const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
   
   const width = canvas.width;
   const plotWidth = width - 20;
   
-  // Oblicz indeks najbliższego punktu
+  // Calculate nearest point index
   // x = 10 + (index / (N-1)) * plotWidth
   // index ~= (x - 10) / plotWidth * (N-1)
   const indexFloat = ((mouseX - 10) / plotWidth) * (data.points.length - 1);
   let index = Math.round(indexFloat);
   
-  // Ograniczenie do zakresu tablicy
+  // Clamp to array bounds
   if (index < 0) index = 0;
   if (index >= data.points.length) index = data.points.length - 1;
 
-  // Przerysuj z podświetleniem
+  // Redraw with highlight
   renderChart(canvas, data.points, { color: data.color, highlightIndex: index });
 }
 
@@ -247,7 +247,7 @@ function updateCharts(history) {
     y: percent(item.driveUsedBytes, item.driveTotalBytes)
   }));
 
-  // Zapisujemy dane do pamięci podręcznej dla zdarzeń myszy
+  // Save data to cache for mouse events
   chartsData.set(cpuChart, { points: cpuPoints, color: '#e4572e' });
   chartsData.set(ramChart, { points: ramPoints, color: '#2d9cdb' });
   chartsData.set(diskChart, { points: diskPoints, color: '#1b998b' });
@@ -263,11 +263,11 @@ function renderChart(canvas, points, { color, highlightIndex }) {
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
 
-  // Tło
+  // Background
   ctx.fillStyle = '#faf6f1';
   ctx.fillRect(0, 0, width, height);
 
-  // Linie siatki
+  // Grid lines
   ctx.strokeStyle = '#e4ded5';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i += 1) {
@@ -318,13 +318,13 @@ function renderChart(canvas, points, { color, highlightIndex }) {
   ctx.fillStyle = gradient;
   ctx.fill();
 
-  // Interaktywny punkt (tylko jeśli highlightIndex jest zdefiniowany)
+  // Interactive point (only if highlightIndex is defined)
   if (typeof highlightIndex === 'number') {
     const point = points[highlightIndex];
     const px = getX(highlightIndex);
     const py = getY(point.y);
 
-    // Pionowa linia
+    // Vertical line
     ctx.beginPath();
     ctx.moveTo(px, 10);
     ctx.lineTo(px, height - 10);
@@ -332,7 +332,7 @@ function renderChart(canvas, points, { color, highlightIndex }) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Kropka
+    // Dot
     ctx.beginPath();
     ctx.arc(px, py, 7, 0, Math.PI * 2);
     ctx.fillStyle = '#fff';
@@ -353,7 +353,7 @@ function renderChart(canvas, points, { color, highlightIndex }) {
     let boxX = px - textWidth / 2 - padding;
     let boxY = py - 50;
 
-    // Zabezpieczenie przed wyjściem poza ekran
+    // Safety check to keep within screen bounds
     if (boxX < 0) boxX = 5;
     if (boxX + textWidth + 2 * padding > width) boxX = width - textWidth - 2 * padding - 5;
     if (boxY < 5) boxY = py + 25;
@@ -403,5 +403,5 @@ function formatBytes(bytes) {
 
 loadMachines();
 
-// Auto-odświeżanie co 30 sekund
+// Auto-refresh every 30 seconds
 setInterval(() => loadMachines(true), 30000);

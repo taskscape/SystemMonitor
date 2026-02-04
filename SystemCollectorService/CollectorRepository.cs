@@ -384,7 +384,7 @@ public sealed class CollectorRepository
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
         
-        // Najpierw upewnijmy się, że maszyna istnieje
+        // First ensure the machine exists
         var machineId = await UpsertMachineAsync(connection, null, machineName, DateTimeOffset.UtcNow, cancellationToken);
 
         await using var command = connection.CreateCommand();
