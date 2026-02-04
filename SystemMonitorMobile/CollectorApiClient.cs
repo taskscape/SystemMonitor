@@ -41,4 +41,16 @@ public sealed class CollectorApiClient
         var points = await _httpClient.GetFromJsonAsync<List<HistoryPointDto>>(url, _jsonOptions, cancellationToken);
         return points ?? new List<HistoryPointDto>();
     }
+
+    public async Task RestartMachineAsync(string machineName, CancellationToken cancellationToken)
+    {
+        var url = new Uri(new Uri(_settings.BaseUrl), $"/api/v1/machines/{Uri.EscapeDataString(machineName)}/commands");
+        
+        // HARDCODED JSON - Zero dependencies, zero crashes.
+        var json = "{\"commandType\":\"restart\"}";
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        
+        var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 }

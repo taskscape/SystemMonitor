@@ -115,6 +115,17 @@ public sealed class DatabaseInitializer
             CREATE INDEX IF NOT EXISTS idx_drive_samples_machine_sample ON drive_samples(machine_sample_id);
             CREATE INDEX IF NOT EXISTS idx_process_samples_machine_sample ON process_samples(machine_sample_id);
             CREATE INDEX IF NOT EXISTS idx_machine_minute_cache_machine_time ON machine_minute_cache(machine_id, bucket_start_utc DESC);
+
+            CREATE TABLE IF NOT EXISTS machine_commands (
+                id BIGSERIAL PRIMARY KEY,
+                machine_id INTEGER NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+                command_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending', -- pending, executing, completed, failed
+                result TEXT,
+                created_at_utc TIMESTAMPTZ NOT NULL,
+                updated_at_utc TIMESTAMPTZ NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_machine_commands_machine_status ON machine_commands(machine_id, status);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

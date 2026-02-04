@@ -10,4 +10,5 @@ public sealed class MonitorSettings
     public int PushIntervalSeconds { get; set; } = 10;
     public int RetryDelaySeconds { get; set; } = 60;
     public int RetentionDays { get; set; } = 7;
+    public bool TrustAllCertificates { get; set; } = false;
 }

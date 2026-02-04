@@ -38,6 +38,12 @@
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 	</PropertyGroup>
 
+	<!-- FIX: Zapobiegaj wycinaniu System.Text.Json przez linker Androida -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+		<TrimmerRootAssembly Include="System.Text.Json" />
+		<TrimmerRootAssembly Include="System.Net.Http.Json" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />

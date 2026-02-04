@@ -379,4 +379,66 @@ public sealed class CollectorRepository
 
         return drives;
     }
+
+    public async Task AddCommandAsync(string machineName, string commandType, CancellationToken cancellationToken)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        
+        // Najpierw upewnijmy się, że maszyna istnieje
+        var machineId = await UpsertMachineAsync(connection, null, machineName, DateTimeOffset.UtcNow, cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO machine_commands (machine_id, command_type, status, created_at_utc, updated_at_utc)
+            VALUES (@machine_id, @type, 'pending', @now, @now);
+            """;
+        command.Parameters.AddWithValue("@machine_id", machineId);
+        command.Parameters.AddWithValue("@type", commandType);
+        command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CommandResponseDto>> GetPendingCommandsAsync(string machineName, CancellationToken cancellationToken)
+    {
+        var results = new List<CommandResponseDto>();
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT c.id, c.command_type, c.created_at_utc
+            FROM machine_commands c
+            JOIN machines m ON m.id = c.machine_id
+            WHERE m.name = @name AND c.status = 'pending'
+            ORDER BY c.created_at_utc;
+            """;
+        command.Parameters.AddWithValue("@name", machineName);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(new CommandResponseDto(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetFieldValue<DateTimeOffset>(2)));
+        }
+
+        return results;
+    }
+
+    public async Task UpdateCommandStatusAsync(long commandId, string status, string? result, CancellationToken cancellationToken)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE machine_commands
+            SET status = @status, result = @result, updated_at_utc = @now
+            WHERE id = @id;
+            """;
+        command.Parameters.AddWithValue("@id", commandId);
+        command.Parameters.AddWithValue("@status", status);
+        command.Parameters.AddWithValue("@result", (object?)result ?? DBNull.Value);
+        command.Parameters.AddWithValue("@now", DateTimeOffset.UtcNow);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 }

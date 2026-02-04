@@ -27,6 +27,7 @@ builder.WebHost.UseUrls(listenUrl);
 
 var app = builder.Build();
 
+app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
@@ -75,6 +76,36 @@ app.MapGet("/api/v1/machines/{machineName}/history", async (
 
     var history = await repository.GetHistoryAsync(machineName, historyDays, cancellationToken);
     return history.Count == 0 ? Results.NotFound() : Results.Ok(history);
+});
+
+// Endpointy dla komend
+app.MapPost("/api/v1/machines/{machineName}/commands", async (
+    string machineName,
+    CommandRequestDto request,
+    CollectorRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    await repository.AddCommandAsync(machineName, request.CommandType, cancellationToken);
+    return Results.Accepted();
+});
+
+app.MapGet("/api/v1/machines/{machineName}/commands/pending", async (
+    string machineName,
+    CollectorRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    var commands = await repository.GetPendingCommandsAsync(machineName, cancellationToken);
+    return Results.Ok(commands);
+});
+
+app.MapPost("/api/v1/commands/{commandId}/status", async (
+    long commandId,
+    CommandStatusUpdateDto update,
+    CollectorRepository repository,
+    CancellationToken cancellationToken) =>
+{
+    await repository.UpdateCommandStatusAsync(commandId, update.Status, update.Result, cancellationToken);
+    return Results.Ok();
 });
 
 app.Run();

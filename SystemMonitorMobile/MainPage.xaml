@@ -74,6 +74,11 @@
 
                     <Label Text="{Binding LastSeen, StringFormat='Last seen: {0}'}" HorizontalOptions="Center" TextColor="{DynamicResource SecondaryText}" FontSize="12" />
 
+                    <!-- Quick Actions -->
+                    <Border StrokeShape="RoundRectangle 16" StrokeThickness="0" BackgroundColor="{DynamicResource PanelBackground}" Padding="16">
+                        <Button Text="RESTART SYSTEM" Command="{Binding RestartCommand}" BackgroundColor="#E74C3C" TextColor="White" FontAttributes="Bold" CornerRadius="12" HeightRequest="44" />
+                    </Border>
+
                     <!-- Trend Chart -->
                     <VerticalStackLayout Spacing="8">
                         <Label Text="Performance Trend (7 days)" FontSize="16" FontAttributes="Bold" TextColor="{DynamicResource PrimaryText}" />

@@ -41,6 +41,7 @@ public sealed class MainViewModel : BindableBase
         
         RefreshCommand = new Command(async () => await RefreshAsync());
         SaveConfigCommand = new Command(SaveConfig);
+        RestartCommand = new Command(async () => await RestartAsync());
         
         // Domyślnie pokazujemy ekran konfiguracji przy starcie, aby użytkownik mógł wpisać adres
         IsConfigured = false; 
@@ -48,6 +49,7 @@ public sealed class MainViewModel : BindableBase
 
     public ICommand RefreshCommand { get; }
     public ICommand SaveConfigCommand { get; }
+    public ICommand RestartCommand { get; }
 
     public bool IsBusy
     {
@@ -218,6 +220,41 @@ public sealed class MainViewModel : BindableBase
         }
     }
 
+    private async Task RestartAsync()
+    {
+        try
+        {
+            if (SelectedMachine == null || IsBusy) return;
+
+            var page = Application.Current?.MainPage;
+            if (page == null)
+            {
+                StatusMessage = "Err: No UI context";
+                return;
+            }
+
+            bool confirm = await page.DisplayAlert(
+                "Restart Machine",
+                $"Are you sure you want to restart {SelectedMachine.MachineName}?",
+                "Yes", "No");
+
+            if (!confirm) return;
+
+            IsBusy = true;
+            StatusMessage = "Sending restart command...";
+            await _apiClient.RestartMachineAsync(SelectedMachine.MachineName, CancellationToken.None);
+            StatusMessage = "Restart command sent!";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Err: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     private async Task LoadSelectionAsync()
     {
         if (SelectedMachine is null) return;
@@ -288,7 +325,7 @@ public sealed class MainViewModel : BindableBase
                 RamPercent = Percent(current.RamUsedBytes, current.RamTotalBytes);
                 DrivePercent = Percent(driveTotals.used, driveTotals.total);
                 
-                LastSeen = current.TimestampUtc.ToLocalTime().ToString("g");
+                LastSeen = current.TimestampUtc.ToLocalTime().ToString("HH:mm dd.MM.yyyy");
 
                 Drives.Clear();
                 foreach(var d in current.Drives)

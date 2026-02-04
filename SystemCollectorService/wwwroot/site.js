@@ -1,5 +1,6 @@
 const machineSelect = document.getElementById('machineSelect');
 const refreshBtn = document.getElementById('refreshBtn');
+const restartBtn = document.getElementById('restartBtn');
 const statusChip = document.getElementById('statusChip');
 const cpuNow = document.getElementById('cpuNow');
 const ramNow = document.getElementById('ramNow');
@@ -53,6 +54,37 @@ function handleChartHover(e, canvas) {
 
 refreshBtn.addEventListener('click', () => {
   loadMachines(true);
+});
+
+restartBtn.addEventListener('click', async () => {
+  const machineName = machineSelect.value;
+  if (!machineName) return;
+
+  if (!confirm(`Are you sure you want to RESTART machine "${machineName}"?`)) {
+    return;
+  }
+
+  try {
+    setStatus('Sending Command...');
+    const response = await fetch(`/api/v1/machines/${encodeURIComponent(machineName)}/commands`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ commandType: 'restart' })
+    });
+
+    if (response.ok || response.status === 202) {
+      alert('Restart command sent successfully!');
+    } else {
+      alert('Failed to send command.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error sending command.');
+  } finally {
+    setStatus('Ready');
+  }
 });
 
 machineSelect.addEventListener('change', () => {
@@ -109,10 +141,14 @@ async function loadMachines(force = false) {
 
 async function loadSelection() {
   const machineName = machineSelect.value;
+  
   if (!machineName) {
+    restartBtn.style.display = 'none';
     resetDashboard();
     return;
   }
+  
+  restartBtn.style.display = 'inline-block';
 
   setStatus('Loading');
   try {
@@ -156,9 +192,15 @@ function updateCurrent(current) {
   diskNow.textContent = `${drivePercent.toFixed(1)}%`;
   
   const dateObj = new Date(current.timestampUtc);
+  const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  const dateStr = `${day}.${month}.${year}`;
+
   lastSeen.innerHTML = `
-    <div>${dateObj.toLocaleTimeString()}</div>
-    <div style="font-size: 0.6em; opacity: 0.7; margin-top: -2px;">${dateObj.toLocaleDateString()}</div>
+    <div>${timeStr}</div>
+    <div style="font-size: 0.6em; opacity: 0.7; margin-top: -2px;">${dateStr}</div>
   `;
 }
 
