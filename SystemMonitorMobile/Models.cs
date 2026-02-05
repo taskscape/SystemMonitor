@@ -6,7 +6,7 @@ namespace SystemMonitorMobile;
 public sealed class CollectorSettings
 {
     private const string Key = "server_url";
-    private const string DefaultUrl = "http://10.0.2.2:5100";
+    private const string DefaultUrl = "https://10.0.2.2:5101";
 
     public string BaseUrl
     {

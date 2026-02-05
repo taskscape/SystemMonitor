@@ -21,7 +21,7 @@
                 
                 <Label Text="Enter the URL of your SystemCollectorService." TextColor="{DynamicResource SecondaryText}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
 
-                <Entry Text="{Binding ServerUrlInput}" Placeholder="http://192.168.1.15:5100" BackgroundColor="White" TextColor="Black" HeightRequest="50" />
+                <Entry Text="{Binding ServerUrlInput}" Placeholder="https://192.168.1.15:5101" BackgroundColor="White" TextColor="Black" HeightRequest="50" />
                 
                 <Button Text="Save &amp; Connect" Command="{Binding SaveConfigCommand}" BackgroundColor="{DynamicResource Accent}" TextColor="White" FontAttributes="Bold" CornerRadius="12" HeightRequest="50" />
             </VerticalStackLayout>

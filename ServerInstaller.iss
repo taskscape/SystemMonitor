@@ -15,15 +15,15 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "publish_collector\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
-; Otwarcie portu 5100 w Firewallu
-Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""System Monitor Collector"" dir=in action=allow protocol=TCP localport=5100"; Flags: runhidden
+; Open port 5101 in Firewall
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""System Monitor Collector"" dir=in action=allow protocol=TCP localport=5101"; Flags: runhidden
 
 ; Rejestracja i start usługi
 Filename: "{sys}\sc.exe"; Parameters: "create SystemCollectorService binPath= ""{app}\SystemCollectorService.exe"" start= auto obj= LocalSystem"; Flags: runhidden
 Filename: "{sys}\sc.exe"; Parameters: "start SystemCollectorService"; Flags: runhidden
 
-; Otwarcie przeglądarki po instalacji
-Filename: "http://localhost:5100"; Flags: shellexec nowait postinstall skipifsilent; Description: "Otwórz panel monitoringu"
+; Open browser after installation
+Filename: "https://localhost:5101"; Flags: shellexec nowait postinstall skipifsilent; Description: "Open monitoring dashboard"
 
 [UninstallRun]
 ; Sprzątanie
