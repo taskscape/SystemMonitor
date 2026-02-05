@@ -1,110 +1,60 @@
-# SystemMonitorService
+# SystemMonitor
 
-Windows service that samples CPU, RAM, and fixed drive usage every second, captures per-process CPU/RAM, keeps one week of local history, and pushes batches to a REST collector.
+A distributed system monitoring solution consisting of a Windows Service (Collector), a Client Service (Monitor), and a Mobile App.
 
-## Build
+## Infrastructure (Server-side)
 
-```
-dotnet build SystemMonitorService/SystemMonitorService.csproj
-```
+The system now uses **RabbitMQ** for metrics queuing and **PostgreSQL** for storage. The easiest way to start the infrastructure is using Docker:
 
-## Run as a Windows service
-
-Example using `sc.exe` (run from an elevated prompt):
-
-```
-sc.exe create SystemMonitorService binPath= "C:\Projects\SystemMonitor\SystemMonitorService\bin\Release\net10.0-windows\SystemMonitorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemMonitorService
+```bash
+docker-compose up -d
 ```
 
-The service is expected to run under an elevated account (for example, `LocalSystem`) to access full process metrics.
+This will start:
+- **PostgreSQL** on port `5432`
+- **RabbitMQ** on ports `5672` (AMQP) and `15672` (Management UI)
 
-## Configuration
+## SystemCollectorService (Server)
 
-Edit `SystemMonitorService/appsettings.json`:
+Windows service that receives `SystemMonitorService` payloads via RabbitMQ or REST, stores them in PostgreSQL, and hosts a web UI for fleet history.
 
-- `MonitorSettings:CollectorEndpoint` - REST endpoint used for pushing metrics.
-- `MonitorSettings:DatabasePath` - SQLite path. Leave empty to use `C:\ProgramData\SystemMonitorService\monitor.db`.
-- `MonitorSettings:PushBatchSize` - batch size sent per request.
-- `MonitorSettings:PushIntervalSeconds` - interval between push attempts.
-- `MonitorSettings:RetryDelaySeconds` - minimum delay before retrying failed pushes.
-- `MonitorSettings:RetentionDays` - days to keep local records.
-
-## Collector contract (proposed)
-
-Endpoint:
-
-```
-POST /api/v1/metrics
-Content-Type: application/json
-```
-
-Request body is an array of samples:
-
-```json
-[
-  {
-    "machineName": "HOST01",
-    "machine": {
-      "timestampUtc": "2026-01-10T22:10:00Z",
-      "cpuPercent": 23.4,
-      "ramUsedBytes": 7340032000,
-      "ramTotalBytes": 17179869184
-    },
-    "drives": [
-      {
-        "name": "C:\\",
-        "totalBytes": 511705088000,
-        "usedBytes": 348966092800
-      }
-    ],
-    "processes": [
-      {
-        "processId": 1234,
-        "processName": "chrome",
-        "cpuPercent": 5.2,
-        "ramBytes": 524288000
-      }
-    ]
-  }
-]
-```
-
-Success response: any `2xx` status. Non-`2xx` response or network failure causes the batch to be retried no sooner than one minute later.
-
-# SystemCollectorService
-
-Windows service that receives `SystemMonitorService` payloads, stores them in PostgreSQL, and hosts a web UI for fleet history.
-
-## Build
-
-```
+### Build
+```bash
 dotnet build SystemCollectorService/SystemCollectorService.csproj
 ```
 
-## Run as a Windows service
-
-Example using `sc.exe` (run from an elevated prompt):
-
-```
-sc.exe create SystemCollectorService binPath= "C:\Projects\SystemMonitor\SystemCollectorService\bin\Release\net10.0-windows\SystemCollectorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemCollectorService
-```
-
-## Configuration
-
+### Configuration
 Edit `SystemCollectorService/appsettings.json`:
+- `CollectorSettings:ConnectionString` - PostgreSQL connection string.
+- `CollectorSettings:ListenUrl` - HTTPS listen address (default `https://0.0.0.0:5101`).
+- `CollectorSettings:RabbitMqHostName` - Hostname for RabbitMQ (default `localhost`).
 
-- `CollectorSettings:ConnectionString` - PostgreSQL connection string. The service creates the database and schema if missing.
-- `CollectorSettings:ListenUrl` - HTTP listen address (default `http://0.0.0.0:5100`).
+### UI & API
+- **Web UI:** `https://<collector-host>:5101/`
+- `POST /api/v1/metrics` - Ingests metrics (now pushes to RabbitMQ queue).
+- `GET /api/v1/machines` - Lists registered computers.
 
-## API
+---
 
-- `POST /api/v1/metrics` accepts the JSON array produced by `SystemMonitorService`.
-- `GET /api/v1/machines` lists registered computers.
-- `GET /api/v1/machines/{machineName}/current` returns the latest sample.
-- `GET /api/v1/machines/{machineName}/history?days=7` returns seven days of history.
+## SystemMonitorService (Client)
 
-## UI
+Windows service that samples CPU, RAM, and fixed drive usage every second and pushes batches to the collector.
 
-Browse to `http://<collector-host>:5100/` and choose a machine to view current CPU/RAM/HDD usage and charts for the last 7 days.
+### Build
+```bash
+dotnet build SystemMonitorService/SystemMonitorService.csproj
+```
+
+### Configuration
+Edit `SystemMonitorService/appsettings.json`:
+- `MonitorSettings:CollectorEndpoint` - REST endpoint (e.g., `https://<collector-ip>:5101/api/v1/metrics`).
+
+---
+
+## SystemMonitorMobile (App)
+
+MAUI application to monitor your fleet from anywhere.
+
+### Configuration
+Edit `SystemMonitorMobile/Resources/Raw/appsettings.json`:
+- `CollectorSettings:BaseUrl` - Base URL of the collector (e.g., `https://<collector-ip>:5101`).

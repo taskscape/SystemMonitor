@@ -4,47 +4,35 @@ Solution: SystemMonitor
 
 ## Intended use
 
-Windows service that receives metrics from SystemMonitorService, stores them in PostgreSQL with 1-minute averaged cache, and serves a web UI plus API for browsing machine history.
+Windows service that receives metrics from SystemMonitorService, queues them via **RabbitMQ**, and processes them into **PostgreSQL**. It also serves a web UI and API.
 
 ## Integration requirements
 
-- SystemMonitorService posts to POST /api/v1/metrics.
-- PostgreSQL is required; the service creates the database and schema if missing.
-- Mobile and web clients call the REST endpoints exposed by this service.
+- **RabbitMQ:** Required for asynchronous metrics processing.
+- **PostgreSQL:** Required for persistent storage.
+- Use `docker-compose up -d` in the root directory to start both.
 
 ## Main software patterns
 
-- Minimal API (ASP.NET Core) for REST endpoints and static file hosting.
-- Background startup task (IHostedService) for database initialization.
-- Repository pattern for persistence and queries.
-- Options pattern (CollectorSettings) for configuration binding.
+- **RabbitMQ Integration:** Uses a Producer (REST API) and Consumer (Background Service) pattern for scalable ingestion.
+- **Minimal API:** For REST endpoints and static file hosting.
+- **Background Services:** One for database initialization and another for consuming RabbitMQ messages.
 
 ## Configuration
 
-File: appsettings.json
+File: `appsettings.json`
 
-- CollectorSettings:ConnectionString (string) PostgreSQL connection string.
-- CollectorSettings:ListenUrl (string) HTTP listen URL (default http://0.0.0.0:5100).
-
-## Logging
-
-Uses Microsoft.Extensions.Logging with appsettings.json levels. Logs database creation events and ingestion errors.
+- `CollectorSettings:ConnectionString`: PostgreSQL connection string.
+- `CollectorSettings:ListenUrl`: HTTPS listen URL (default `https://0.0.0.0:5101`).
+- `CollectorSettings:RabbitMqHostName`: RabbitMQ host (default `localhost`).
 
 ## Deployment
 
-Build:
-
-```
-dotnet build SystemCollectorService/SystemCollectorService.csproj
-```
-
 Install as Windows service (elevated prompt):
 
-```
-sc.exe create SystemCollectorService binPath= "C:\Projects\SystemMonitor\SystemCollectorService\bin\Release\net10.0-windows\SystemCollectorService.exe" start= auto obj= LocalSystem
+```powershell
+sc.exe create SystemCollectorService binPath= "C:\Path\To\SystemCollectorService.exe" start= auto obj= LocalSystem
 sc.exe start SystemCollectorService
 ```
 
-Open UI:
-
-- http://<collector-host>:5100/
+Open UI: `https://<collector-host>:5101/`
