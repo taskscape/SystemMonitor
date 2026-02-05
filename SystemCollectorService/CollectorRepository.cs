@@ -75,32 +75,32 @@ public sealed class CollectorRepository
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
 
-        await using var cacheCommand = connection.CreateCommand();
-        cacheCommand.CommandText = """
-            SELECT m.name, c.bucket_start_utc, c.cpu_percent_avg, c.ram_used_bytes_avg, c.ram_total_bytes_avg
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT m.name, ms.timestamp_utc, ms.cpu_percent, ms.ram_used_bytes, ms.ram_total_bytes
             FROM machines m
-            JOIN machine_minute_cache c ON c.machine_id = m.id
+            JOIN machine_samples ms ON ms.machine_id = m.id
             WHERE m.name = @name
-            ORDER BY c.bucket_start_utc DESC
+            ORDER BY ms.timestamp_utc DESC
             LIMIT 1;
             """;
-        cacheCommand.Parameters.AddWithValue("@name", machineName);
+        command.Parameters.AddWithValue("@name", machineName);
 
-        await using var cacheReader = await cacheCommand.ExecuteReaderAsync(cancellationToken);
-        if (!await cacheReader.ReadAsync(cancellationToken))
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
         {
             return null;
         }
 
         var dto = new MachineCurrentDto(
-            cacheReader.GetString(0),
-            cacheReader.GetFieldValue<DateTimeOffset>(1),
-            cacheReader.GetDouble(2),
-            cacheReader.GetDouble(3),
-            cacheReader.GetDouble(4),
+            reader.GetString(0),
+            reader.GetFieldValue<DateTimeOffset>(1),
+            reader.GetDouble(2),
+            reader.GetDouble(3),
+            reader.GetDouble(4),
             Array.Empty<DriveSnapshotDto>());
 
-        await cacheReader.CloseAsync();
+        await reader.CloseAsync();
 
         var sampleId = await GetLatestSampleIdAsync(connection, machineName, cancellationToken);
         var drives = sampleId is null
