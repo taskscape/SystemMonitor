@@ -31,6 +31,7 @@ public sealed class DatabaseInitializer
 
         await EnsureDatabaseExistsAsync(adminBuilder.ConnectionString, targetDatabase, cancellationToken);
         await EnsureSchemaAsync(builder.ConnectionString, cancellationToken);
+        _logger.LogInformation("Database initialized successfully on {Port}.", builder.Port);
     }
 
     private async Task EnsureDatabaseExistsAsync(

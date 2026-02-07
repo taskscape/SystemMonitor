@@ -13,6 +13,10 @@ builder.Services.AddSingleton<DatabaseInitializer>();
 builder.Services.AddSingleton<CollectorRepository>();
 builder.Services.AddHostedService<StartupService>();
 
+// RabbitMQ Services
+builder.Services.AddSingleton<IMetricsProducer, RabbitMqProducer>();
+builder.Services.AddHostedService<MetricsConsumer>();
+
 builder.Services.AddSingleton(sp =>
 {
     var settings = sp.GetRequiredService<IOptions<CollectorSettings>>().Value;
@@ -33,7 +37,7 @@ app.UseStaticFiles();
 
 app.MapPost("/api/v1/metrics", async (
     List<MetricsPayload> payload,
-    CollectorRepository repository,
+    IMetricsProducer producer,
     CancellationToken cancellationToken) =>
 {
     if (payload.Count == 0)
@@ -41,8 +45,11 @@ app.MapPost("/api/v1/metrics", async (
         return Results.BadRequest("Payload is empty.");
     }
 
-    await repository.StoreBatchAsync(payload, cancellationToken);
-    return Results.Ok();
+    // Publish to queue instead of writing to DB synchronously
+    await producer.PublishMetricsAsync(payload, cancellationToken);
+    
+    // Return Accepted (202) to indicate processing has started
+    return Results.Accepted();
 });
 
 app.MapGet("/api/v1/machines", async (

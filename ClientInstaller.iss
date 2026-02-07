@@ -1,6 +1,6 @@
 [Setup]
 AppName=System Monitor Client
-AppVersion=1.0
+AppVersion=1.1
 DefaultDirName={autopf}\SystemMonitorClient
 DefaultGroupName=System Monitor
 OutputDir=.
