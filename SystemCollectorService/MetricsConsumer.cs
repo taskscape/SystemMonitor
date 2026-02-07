@@ -147,11 +147,6 @@ public sealed class MetricsConsumer : BackgroundService
             await repository.StoreBatchAsync(batch, cancellationToken);
 
             // Ack all messages involved in this batch
-            // Since RabbitMQ requires strictly increasing delivery tags for MultiAck, 
-            // and we might have mixed tags or reordered them (less likely here but possible in complex scenarios),
-            // safe approach is to Ack individually or find the max tag if we are sure they are sequential.
-            // Here, messages arrive sequentially. We can take the Max(tag) and AckMultiple = true?
-            // Wait: If we Nack'd some "bad" messages in between, AckMultiple might ack them too accidentally if not handled carefully.
             // Safer: Loop and Ack individual tags. It's slightly more network chatter but safer logic.
             
             foreach (var tag in tags)

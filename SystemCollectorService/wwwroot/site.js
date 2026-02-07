@@ -59,12 +59,21 @@ machineSelect.addEventListener('change', () => {
   loadSelection();
 });
 
-function setStatus(text) {
+function setStatus(text, type = 'default') {
   statusChip.textContent = text;
+  if (type === 'online') {
+    statusChip.style.background = '#2ecc7122';
+    statusChip.style.color = '#27ae60';
+  } else if (type === 'offline') {
+    statusChip.style.background = '#e74c3c22';
+    statusChip.style.color = '#c0392b';
+  } else {
+    statusChip.style.background = 'var(--accent-soft)';
+    statusChip.style.color = 'var(--accent)';
+  }
 }
 
 async function loadMachines(force = false) {
-  setStatus('Syncing');
   try {
     const currentSelection = machineSelect ? machineSelect.value : null;
     
@@ -98,11 +107,11 @@ async function loadMachines(force = false) {
       await loadSelection();
     } else {
       resetDashboard();
+      setStatus('No Machines');
     }
-    setStatus('Ready');
   } catch (err) {
     console.error('Load machines error:', err);
-    setStatus('Offline');
+    setStatus('Offline', 'offline');
     resetDashboard();
   }
 }
@@ -114,7 +123,6 @@ async function loadSelection() {
     return;
   }
 
-  setStatus('Loading');
   try {
     const [currentResponse, historyResponse] = await Promise.all([
       fetch(`/api/v1/machines/${encodeURIComponent(machineName)}/current`),
@@ -131,10 +139,9 @@ async function loadSelection() {
     updateCurrent(current);
     updateDrives(current.drives || []);
     updateCharts(history);
-    setStatus('Ready');
   } catch (err) {
     console.error(err);
-    setStatus('Unavailable');
+    setStatus('Unavailable', 'offline');
     resetDashboard();
   }
 }
@@ -151,11 +158,21 @@ function updateCurrent(current) {
   );
   const drivePercent = percent(driveTotals.used, driveTotals.total);
 
+  const dateObj = new Date(current.timestampUtc);
+  const now = new Date();
+  const diffSeconds = (now - dateObj) / 1000;
+  
+  const isOnline = diffSeconds < 30; // 30 seconds threshold
+  if (isOnline) {
+    setStatus('Online', 'online');
+  } else {
+    setStatus('Offline', 'offline');
+  }
+
   cpuNow.textContent = `${current.cpuPercent.toFixed(1)}%`;
   ramNow.textContent = `${ramPercent.toFixed(1)}%`;
   diskNow.textContent = `${drivePercent.toFixed(1)}%`;
   
-  const dateObj = new Date(current.timestampUtc);
   lastSeen.innerHTML = `
     <div>${dateObj.toLocaleTimeString()}</div>
     <div style="font-size: 0.6em; opacity: 0.7; margin-top: -2px;">${dateObj.toLocaleDateString()}</div>
@@ -361,5 +378,5 @@ function formatBytes(bytes) {
 
 loadMachines();
 
-// Auto-odświeżanie co 30 sekund
-setInterval(() => loadMachines(true), 30000);
+// Auto-refresh every 5 seconds
+setInterval(() => loadMachines(true), 5000);
