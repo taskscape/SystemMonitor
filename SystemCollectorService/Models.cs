@@ -47,3 +47,12 @@ public sealed record HistoryPointDto(
     double RamTotalBytes,
     double DriveUsedBytes,
     double DriveTotalBytes);
+
+public sealed record CommandRequestDto(string CommandType);
+
+public sealed record CommandResponseDto(
+    long Id,
+    string CommandType,
+    DateTimeOffset CreatedAtUtc);
+
+public sealed record CommandStatusUpdateDto(string Status, string? Result);

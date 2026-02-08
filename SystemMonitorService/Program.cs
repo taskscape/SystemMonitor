@@ -9,8 +9,40 @@ builder.Services.Configure<MonitorSettings>(
     builder.Configuration.GetSection(MonitorSettings.SectionName));
 
 builder.Services.AddSingleton<MetricsCollector>();
+
 builder.Services.AddSingleton<SqliteStorage>();
-builder.Services.AddHttpClient<MetricsPusher>();
+
+
+
+// Common HTTP Handler configuration (SSL Bypass)
+Func<IServiceProvider, HttpMessageHandler> configureHandler = sp =>
+
+{
+
+    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MonitorSettings>>().Value;
+
+    var handler = new HttpClientHandler();
+
+    if (settings.TrustAllCertificates)
+
+    {
+
+        handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+
+    }
+
+    return handler;
+
+};
+
+
+
+builder.Services.AddHttpClient<MetricsPusher>().ConfigurePrimaryHttpMessageHandler(configureHandler);
+
+builder.Services.AddHttpClient<CommandExecutor>().ConfigurePrimaryHttpMessageHandler(configureHandler);
+
+
+
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();

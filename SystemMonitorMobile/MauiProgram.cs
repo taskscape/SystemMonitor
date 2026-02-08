@@ -23,8 +23,17 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<CollectorSettings>();
         
-        // Rejestracja HTTP Clienta
-        builder.Services.AddSingleton(sp => new HttpClient());
+        // Register HTTP Client with SSL error bypass in Debug mode
+        builder.Services.AddSingleton(sp => 
+        {
+#if DEBUG
+            var handler = new HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+            return new HttpClient(handler);
+#else
+            return new HttpClient();
+#endif
+        });
         builder.Services.AddSingleton<CollectorApiClient>();
         
         builder.Services.AddSingleton<MainViewModel>();

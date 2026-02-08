@@ -14,14 +14,18 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "publish_monitor\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]
-; Create service
-Filename: "{sys}\sc.exe"; Parameters: "create SystemMonitorService binPath= ""{app}\SystemMonitorService.exe"" start= auto obj= LocalSystem"; Flags: runhidden
+; Step 1: Install the service
+Filename: "{sys}\sc.exe"; Parameters: "create SystemMonitorService binPath= ""{app}\SystemMonitorService.exe"" start= auto obj= LocalSystem displayname= ""System Monitor Service"""; Flags: runhidden
+; Step 1b: Set service description
+Filename: "{sys}\sc.exe"; Parameters: "description SystemMonitorService ""Collects system performance metrics and executes remote administrative commands."""; Flags: runhidden
+; Step 1c: Configure failure recovery (Restart after 1 minute)
+Filename: "{sys}\sc.exe"; Parameters: "failure SystemMonitorService reset= 86400 actions= restart/60000/restart/60000/restart/60000"; Flags: runhidden
 
-; Open config for IP address setup
-Filename: "notepad.exe"; Parameters: "{app}\appsettings.json"; Description: "Configure Server IP address"; Flags: shellexec waituntilterminated postinstall
+; Step 2: Open configuration file in Notepad
+Filename: "notepad.exe"; Parameters: "{app}\appsettings.json"; Description: "Edit configuration (Enter server IP address)"; Flags: shellexec waituntilterminated postinstall
 
-; Start service
-Filename: "{sys}\sc.exe"; Parameters: "start SystemMonitorService"; Description: "Start monitoring service"; Flags: runhidden postinstall
+; Step 3: Start the service
+Filename: "{sys}\sc.exe"; Parameters: "start SystemMonitorService"; Description: "Start the monitoring service"; Flags: runhidden postinstall
 
 [UninstallRun]
 Filename: "{sys}\sc.exe"; Parameters: "stop SystemMonitorService"; Flags: runhidden

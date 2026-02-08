@@ -49,3 +49,12 @@ public sealed record ProcessSamplePayload(
     string ProcessName,
     double CpuPercent,
     long RamBytes);
+
+public sealed record CommandResponse(
+    long Id,
+    string CommandType,
+    DateTimeOffset CreatedAtUtc);
+
+public sealed record CommandStatusUpdate(
+    string Status,
+    string? Result);

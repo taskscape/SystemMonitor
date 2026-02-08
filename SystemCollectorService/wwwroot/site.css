@@ -130,6 +130,16 @@ h1 {
   box-shadow: 0 10px 20px rgba(228, 87, 46, 0.18);
 }
 
+.controls button.btn-danger {
+  background: #dc3545;
+  color: white;
+}
+
+.controls button.btn-danger:hover {
+  background: #bb2d3b;
+  box-shadow: 0 10px 20px rgba(220, 53, 69, 0.25);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

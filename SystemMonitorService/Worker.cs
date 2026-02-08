@@ -9,6 +9,7 @@ public sealed class Worker : BackgroundService
     private readonly MetricsCollector _collector;
     private readonly SqliteStorage _storage;
     private readonly MetricsPusher _pusher;
+    private readonly CommandExecutor _commandExecutor;
     private readonly MonitorSettings _settings;
 
     public Worker(
@@ -16,12 +17,14 @@ public sealed class Worker : BackgroundService
         MetricsCollector collector,
         SqliteStorage storage,
         MetricsPusher pusher,
+        CommandExecutor commandExecutor,
         IOptions<MonitorSettings> options)
     {
         _logger = logger;
         _collector = collector;
         _storage = storage;
         _pusher = pusher;
+        _commandExecutor = commandExecutor;
         _settings = options.Value;
     }
 
@@ -32,8 +35,20 @@ public sealed class Worker : BackgroundService
         var collectTask = CollectLoopAsync(stoppingToken);
         var pushTask = PushLoopAsync(stoppingToken);
         var cleanupTask = CleanupLoopAsync(stoppingToken);
+        var commandTask = CommandLoopAsync(stoppingToken);
 
-        await Task.WhenAll(collectTask, pushTask, cleanupTask);
+        await Task.WhenAll(collectTask, pushTask, cleanupTask, commandTask);
+    }
+
+    private async Task CommandLoopAsync(CancellationToken stoppingToken)
+    {
+        // Check commands every 3 seconds for faster reaction
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            await _commandExecutor.ProcessCommandsAsync(stoppingToken);
+        }
     }
 
     private async Task CollectLoopAsync(CancellationToken stoppingToken)
