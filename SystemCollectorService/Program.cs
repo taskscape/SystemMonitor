@@ -2,7 +2,11 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using SystemCollectorService;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
 builder.Services.AddWindowsService();
 
