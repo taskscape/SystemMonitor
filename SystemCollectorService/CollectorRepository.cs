@@ -171,7 +171,7 @@ public sealed class CollectorRepository
 
     private static async Task<int> UpsertMachineAsync(
         NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        NpgsqlTransaction? transaction,
         string machineName,
         DateTimeOffset lastSeenUtc,
         CancellationToken cancellationToken)

@@ -60,6 +60,9 @@ restartBtn.addEventListener('click', async () => {
   const machineName = machineSelect.value;
   if (!machineName) return;
 
+
+  console.log(`Sending restart command to: ${machineName}`);
+
   if (!confirm(`Are you sure you want to RESTART machine "${machineName}"?`)) {
     return;
   }
@@ -179,6 +182,10 @@ async function loadSelection() {
     console.error(err);
     setStatus('Unavailable', 'offline');
     resetDashboard();
+    // Keep button visible if machine is selected
+    if (machineSelect.value) {
+      restartBtn.style.display = 'inline-block';
+    }
   }
 }
 
@@ -196,9 +203,11 @@ function updateCurrent(current) {
 
   const dateObj = new Date(current.timestampUtc);
   const now = new Date();
-  const diffSeconds = (now - dateObj) / 1000;
+  const diffSeconds = Math.abs(now - dateObj) / 1000;
   
-  const isOnline = diffSeconds < 30; // 30 seconds threshold
+  console.log(`Machine: ${current.machineName}, Last Sample (UTC): ${current.timestampUtc}, Local Browser Time: ${now.toISOString()}, Diff: ${diffSeconds}s`);
+
+  const isOnline = diffSeconds < 900; // 15 minutes threshold to handle current backlog
   if (isOnline) {
     setStatus('Online', 'online');
   } else {
