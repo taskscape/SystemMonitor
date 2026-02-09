@@ -25,7 +25,7 @@ builder.Services.AddSingleton(sp =>
 });
 
 var listenUrl = builder.Configuration.GetValue<string>($"{CollectorSettings.SectionName}:ListenUrl")
-    ?? "http://0.0.0.0:5100";
+    ?? "https://0.0.0.0:5101";
 
 builder.WebHost.UseUrls(listenUrl);
 

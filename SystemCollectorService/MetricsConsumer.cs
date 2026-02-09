@@ -12,8 +12,8 @@ public sealed class MetricsConsumer : BackgroundService
     private readonly ConnectionFactory _factory;
     private readonly IServiceProvider _serviceProvider;
     private const string QueueName = "metrics_queue";
-    private const int BatchSize = 50; 
-    private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(5);
+    private const int BatchSize = 100; 
+    private readonly TimeSpan BatchTimeout = TimeSpan.FromSeconds(1);
 
     public MetricsConsumer(
         IOptions<CollectorSettings> settings,
@@ -42,12 +42,12 @@ public sealed class MetricsConsumer : BackgroundService
                     arguments: null,
                     cancellationToken: stoppingToken);
 
-                await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: (ushort)(BatchSize * 2), global: false, cancellationToken: stoppingToken);
+                await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 200, global: false, cancellationToken: stoppingToken);
 
                 _logger.LogInformation("Connected to RabbitMQ with Batch Processing (Size: {BatchSize}, Timeout: {Timeout}s)", BatchSize, BatchTimeout.TotalSeconds);
 
                 var consumer = new AsyncEventingBasicConsumer(channel);
-                var buffer = System.Threading.Channels.Channel.CreateBounded<(MetricsPayload Payload, ulong DeliveryTag)>(new System.Threading.Channels.BoundedChannelOptions(BatchSize * 4)
+                var buffer = System.Threading.Channels.Channel.CreateBounded<(List<MetricsPayload> Payloads, ulong DeliveryTag)>(new System.Threading.Channels.BoundedChannelOptions(BatchSize * 4)
                 {
                     FullMode = System.Threading.Channels.BoundedChannelFullMode.Wait
                 });
@@ -58,14 +58,11 @@ public sealed class MetricsConsumer : BackgroundService
                     {
                         var body = ea.Body.ToArray();
                         var json = Encoding.UTF8.GetString(body);
-                        var payload = JsonSerializer.Deserialize<List<MetricsPayload>>(json);
+                        var payloads = JsonSerializer.Deserialize<List<MetricsPayload>>(json);
 
-                        if (payload is not null && payload.Count > 0)
+                        if (payloads is not null && payloads.Count > 0)
                         {
-                            foreach (var p in payload)
-                            {
-                                await buffer.Writer.WriteAsync((p, ea.DeliveryTag), stoppingToken);
-                            }
+                            await buffer.Writer.WriteAsync((payloads, ea.DeliveryTag), stoppingToken);
                         }
                         else
                         {
@@ -94,7 +91,7 @@ public sealed class MetricsConsumer : BackgroundService
                         while (batch.Count < BatchSize)
                         {
                             var item = await buffer.Reader.ReadAsync(readCts.Token);
-                            batch.Add(item.Payload);
+                            batch.AddRange(item.Payloads);
                             tags.Add(item.DeliveryTag);
                         }
                     }
