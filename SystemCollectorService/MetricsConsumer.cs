@@ -66,23 +66,27 @@ public sealed class MetricsConsumer : BackgroundService
                         }
                         else
                         {
+                            // Empty payload, just ack
                             await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                         }
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error deserializing message.");
+                        // Nack and discard (false) because it's likely malformed
                         await channel.BasicNackAsync(ea.DeliveryTag, false, false, stoppingToken);
                     }
                 };
 
                 await channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
 
+                // Processing Loop
                 var batch = new List<MetricsPayload>(BatchSize);
-                var tags = new HashSet<ulong>();
+                var tags = new HashSet<ulong>(); // To track delivery tags for Ack
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
+                    // Read from buffer with timeout
                     var readCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     readCts.CancelAfter(BatchTimeout);
 
@@ -90,6 +94,7 @@ public sealed class MetricsConsumer : BackgroundService
                     {
                         while (batch.Count < BatchSize)
                         {
+                            // Wait for next item or timeout
                             var item = await buffer.Reader.ReadAsync(readCts.Token);
                             batch.AddRange(item.Payloads);
                             tags.Add(item.DeliveryTag);
@@ -97,6 +102,7 @@ public sealed class MetricsConsumer : BackgroundService
                     }
                     catch (OperationCanceledException)
                     {
+                        // Timeout reached, flush what we have
                     }
 
                     if (batch.Count > 0)
@@ -126,8 +132,12 @@ public sealed class MetricsConsumer : BackgroundService
             using var scope = _serviceProvider.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<CollectorRepository>();
 
+            // Bulk Insert to DB
             await repository.StoreBatchAsync(batch, cancellationToken);
 
+            // Ack all messages involved in this batch
+            // Safer: Loop and Ack individual tags. It's slightly more network chatter but safer logic.
+            
             foreach (var tag in tags)
             {
                 await channel.BasicAckAsync(tag, false, cancellationToken);
@@ -138,6 +148,8 @@ public sealed class MetricsConsumer : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to flush batch to DB. Requeuing messages.");
+            
+            // If DB fails, we must Nack so RabbitMQ redelivers them later.
             foreach (var tag in tags)
             {
                 await channel.BasicNackAsync(tag, false, true, cancellationToken);

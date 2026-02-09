@@ -60,8 +60,11 @@ restartBtn.addEventListener('click', async () => {
   const machineName = machineSelect.value;
   if (!machineName) return;
 
+<<<<<<< HEAD
   console.log(`Sending restart command to: ${machineName}`);
 
+=======
+>>>>>>> origin/main
   if (!confirm(`Are you sure you want to RESTART machine "${machineName}"?`)) {
     return;
   }
