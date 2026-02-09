@@ -16,7 +16,10 @@ public sealed class SqliteStorage
 
         var dbPath = string.IsNullOrWhiteSpace(_settings.DatabasePath)
             ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                Environment.GetFolderPath(
+                    OperatingSystem.IsWindows() 
+                        ? Environment.SpecialFolder.CommonApplicationData 
+                        : Environment.SpecialFolder.LocalApplicationData),
                 "SystemMonitorService",
                 "monitor.db")
             : _settings.DatabasePath;

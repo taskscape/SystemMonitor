@@ -3,7 +3,13 @@ using Microsoft.Extensions.Hosting;
 using SystemMonitorService;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddWindowsService();
+
+#if OS_WINDOWS
+if (OperatingSystem.IsWindows())
+{
+    builder.Services.AddWindowsService();
+}
+#endif
 
 builder.Services.Configure<MonitorSettings>(
     builder.Configuration.GetSection(MonitorSettings.SectionName));
