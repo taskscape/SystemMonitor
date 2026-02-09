@@ -441,4 +441,44 @@ public sealed class CollectorRepository
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    public async Task CleanupOldDataAsync(int retentionDays, CancellationToken cancellationToken)
+    {
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
+        _logger.LogInformation("Cleaning up data older than {Cutoff}...", cutoff);
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            // 1. Delete old machine samples (cascades to drive_samples and process_samples)
+            await using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "DELETE FROM machine_samples WHERE timestamp_utc < @cutoff;";
+                command.Parameters.AddWithValue("@cutoff", cutoff);
+                var deletedSamples = await command.ExecuteNonQueryAsync(cancellationToken);
+                _logger.LogInformation("Deleted {Count} old machine samples.", deletedSamples);
+            }
+
+            // 2. Delete old minute cache
+            await using (var command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "DELETE FROM machine_minute_cache WHERE bucket_start_utc < @cutoff;";
+                command.Parameters.AddWithValue("@cutoff", cutoff);
+                var deletedCache = await command.ExecuteNonQueryAsync(cancellationToken);
+                _logger.LogInformation("Deleted {Count} old cache entries.", deletedCache);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to cleanup old data.");
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
 }

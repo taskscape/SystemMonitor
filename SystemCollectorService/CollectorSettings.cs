@@ -10,4 +10,6 @@ public sealed class CollectorSettings
     public string ListenUrl { get; set; } = "https://0.0.0.0:5101";
     
     public string RabbitMqHostName { get; set; } = "localhost";
+
+    public int RetentionDays { get; set; } = 7;
 }

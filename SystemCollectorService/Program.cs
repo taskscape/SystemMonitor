@@ -12,6 +12,7 @@ builder.Services.Configure<CollectorSettings>(
 builder.Services.AddSingleton<DatabaseInitializer>();
 builder.Services.AddSingleton<CollectorRepository>();
 builder.Services.AddHostedService<StartupService>();
+builder.Services.AddHostedService<DatabaseCleanupService>();
 
 // RabbitMQ Services
 builder.Services.AddSingleton<IMetricsProducer, RabbitMqProducer>();
