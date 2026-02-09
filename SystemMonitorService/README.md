@@ -1,29 +1,29 @@
-# SystemMonitorService
+# SystemMonitorService (Agent)
 
 Solution: SystemMonitor
 
 ## Intended use
 
-Windows service that samples CPU, RAM, disk, and per-process usage, stores a short local history (SQLite), and pushes batched metrics to the collector.
+Windows service that samples CPU, RAM, disk, and per-process usage. It stores samples in a local SQLite buffer and pushes them to the `SystemCollectorService` periodically.
 
-## Integration requirements
+## Features
 
-- **Collector Endpoint:** Must point to the `SystemCollectorService` (default port `5101` with HTTPS).
-- **Permissions:** Runs best under `LocalSystem` to access full process metrics.
+- **Resilience:** Local SQLite storage ensures no data is lost during network outages.
+- **Remote Restart:** Capable of executing system restarts received from the central server.
+
+## Installation & Setup
+
+### Windows
+Run as an administrator to access full system metrics:
+```powershell
+sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
+sc.exe start SystemMonitorService
+```
 
 ## Configuration
 
 File: `appsettings.json`
 
-- `MonitorSettings:CollectorEndpoint`: REST endpoint (e.g., `https://your-server:5101/api/v1/metrics`).
-- `MonitorSettings:DatabasePath`: Path to local SQLite DB.
-- `MonitorSettings:RetentionDays`: Local retention window (default 7 days).
-
-## Deployment
-
-Install as Windows service (elevated prompt):
-
-```powershell
-sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemMonitorService
-```
+- `MonitorSettings:CollectorEndpoint`: URL of the collector (e.g., `https://your-server:5101/api/v1/metrics`).
+- `MonitorSettings:PushIntervalSeconds`: Delay between data uploads (default `30`).
+- `MonitorSettings:TrustAllCertificates`: Set to `true` if using self-signed HTTPS certificates.
