@@ -1,29 +1,31 @@
-# SystemMonitorService (Agent)
+# SystemMonitorService
 
-Solution: SystemMonitor
+Solution: SystemMonitor (Agent)
 
 ## Intended use
 
-Windows service that samples CPU, RAM, disk, and per-process usage. It stores samples in a local SQLite buffer and pushes them to the `SystemCollectorService` periodically.
+Windows service that samples CPU, RAM, disk, and per-process usage, stores a short local history (SQLite), and pushes batched metrics to the collector.
 
-## Features
+## Standalone Features
 
-- **Resilience:** Local SQLite storage ensures no data is lost during network outages.
-- **Remote Restart:** Capable of executing system restarts received from the central server.
-
-## Installation & Setup
-
-### Windows
-Run as an administrator to access full system metrics:
-```powershell
-sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemMonitorService
-```
+- **Local Buffering:** Stores metrics in a local SQLite database if the collector is unreachable.
+- **Auto-Cleanup:** Automatically manages its local database size (default 7-day retention).
+- **Zero Dependencies:** Distributed as a self-contained executable with bundled .NET runtime.
 
 ## Configuration
 
 File: `appsettings.json`
 
-- `MonitorSettings:CollectorEndpoint`: URL of the collector (e.g., `https://your-server:5101/api/v1/metrics`).
-- `MonitorSettings:PushIntervalSeconds`: Delay between data uploads (default `30`).
-- `MonitorSettings:TrustAllCertificates`: Set to `true` if using self-signed HTTPS certificates.
+- `MonitorSettings:CollectorEndpoint`: REST endpoint (e.g., `https://your-server:5101/api/v1/metrics`).
+- `MonitorSettings:TrustAllCertificates`: Set to `true` for development/self-signed certificates.
+- `MonitorSettings:RetentionDays`: Local retention window (default 7 days).
+
+## Deployment
+
+The recommended way to install is using the **SystemMonitorClientSetup.exe** installer.
+
+Manual installation:
+```powershell
+sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
+sc.exe start SystemMonitorService
+```
