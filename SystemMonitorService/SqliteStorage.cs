@@ -14,17 +14,18 @@ public sealed class SqliteStorage
         _logger = logger;
         _settings = options.Value;
 
+        bool isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+
         var dbPath = string.IsNullOrWhiteSpace(_settings.DatabasePath)
             ? Path.Combine(
-                Environment.GetFolderPath(
-                    OperatingSystem.IsWindows() 
-                        ? Environment.SpecialFolder.CommonApplicationData 
-                        : Environment.SpecialFolder.LocalApplicationData),
-                "SystemMonitorService",
+                isWindows ? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                isWindows ? "SystemMonitorService" : ".systemmonitor-agent",
                 "monitor.db")
             : _settings.DatabasePath;
 
-        Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+        var dir = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        
         _connectionString = $"Data Source={dbPath}";
         Initialize();
     }
