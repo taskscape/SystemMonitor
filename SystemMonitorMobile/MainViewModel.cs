@@ -226,14 +226,15 @@ public sealed class MainViewModel : BindableBase
         {
             if (SelectedMachine == null || IsBusy) return;
 
-            var page = Application.Current?.MainPage;
+            var window = Application.Current?.Windows.FirstOrDefault();
+            var page = window?.Page;
             if (page == null)
             {
                 StatusMessage = "Err: No UI context";
                 return;
             }
 
-            bool confirm = await page.DisplayAlert(
+            bool confirm = await page.DisplayAlertAsync(
                 "Restart Machine",
                 $"Are you sure you want to restart {SelectedMachine.MachineName}?",
                 "Yes", "No");

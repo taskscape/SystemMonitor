@@ -7,10 +7,10 @@ if (Test-Path "publish_collector") { Remove-Item -Recurse -Force "publish_collec
 if (Test-Path "publish_monitor") { Remove-Item -Recurse -Force "publish_monitor" }
 
 Write-Host "--- 2. Publishing SystemCollectorService (Server) ---" -ForegroundColor Cyan
-dotnet publish SystemCollectorService/SystemCollectorService.csproj -c Release -o publish_collector /p:PublishSingleFile=false /p:SelfContained=false
+dotnet publish SystemCollectorService/SystemCollectorService.csproj -c Release -o publish_collector -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 
 Write-Host "--- 3. Publishing SystemMonitorService (Client) ---" -ForegroundColor Cyan
-dotnet publish SystemMonitorService/SystemMonitorService.csproj -c Release -o publish_monitor /p:PublishSingleFile=false /p:SelfContained=false
+dotnet publish SystemMonitorService/SystemMonitorService.csproj -c Release -o publish_monitor -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 
 Write-Host "--- 4. Locating Inno Setup Compiler (ISCC.exe) ---" -ForegroundColor Cyan
 $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"

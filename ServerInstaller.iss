@@ -10,6 +10,9 @@ SolidCompression=yes
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 
+[Dirs]
+Name: "{commonappdata}\SystemMonitor"; Permissions: users-modify
+
 [Files]
 ; Copy files from server publication folder
 Source: "publish_collector\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
