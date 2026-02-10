@@ -32,13 +32,13 @@ Source: "publish_monitor\*"; DestDir: "{app}\Client"; Flags: ignoreversion recur
 
 [Run]
 ; --- Server Setup ---
-; Firewall rule for Server (HTTPS port 5101)
-Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""System Monitor Collector"" dir=in action=allow protocol=TCP localport=5101"; Flags: runhidden; Components: server
+; Firewall rule for Server (HTTP port 5100)
+Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""System Monitor Collector"" dir=in action=allow protocol=TCP localport=5100"; Flags: runhidden; Components: server
 ; Create and Start Server Service
 Filename: "{sys}\sc.exe"; Parameters: "create SystemCollectorService binPath= ""{app}\Server\SystemCollectorService.exe"" start= auto obj= LocalSystem"; Flags: runhidden; Components: server
 Filename: "{sys}\sc.exe"; Parameters: "start SystemCollectorService"; Flags: runhidden; Components: server
 ; Open dashboard
-Filename: "https://localhost:5101"; Flags: shellexec nowait postinstall skipifsilent; Description: "Open Server Dashboard"; Components: server
+Filename: "http://localhost:5100"; Flags: shellexec nowait postinstall skipifsilent; Description: "Open Server Dashboard"; Components: server
 
 ; --- Client Setup ---
 ; Create Client Service

@@ -1,59 +1,49 @@
-# SystemMonitor
+# SystemMonitor Suite
 
-A distributed system monitoring solution consisting of a Windows Service (Collector), a Client Service (Monitor), and a Mobile App.
+A lightweight, standalone system monitoring solution consisting of a Windows/Linux Service (Collector), a Client Agent (Monitor), and a Mobile App.
 
-## Features
+## 🚀 Key Features
 
-- **Real-time Monitoring:** Tracks CPU, RAM, Disk usage, and top processes.
-- **Remote Commands:** Trigger system restarts directly from the Web UI or Mobile App.
-- **Asynchronous Ingestion:** Uses RabbitMQ to handle high-volume metrics data.
-- **History & Analytics:** 7-day retention with aggregated minute-by-minute cache.
-- **Auto-Cleanup:** Built-in background service to prune old data automatically.
-
-## Infrastructure (Server-side)
-
-The system uses **RabbitMQ** for metrics queuing and **PostgreSQL** for storage. The easiest way to start the infrastructure is using Docker:
-
-```bash
-docker-compose up -d
-```
-
-This will start:
-- **PostgreSQL** on port `5433` (mapped from `5432`)
-- **RabbitMQ** on ports `5672` (AMQP) and `15672` (Management UI)
-
-## SystemCollectorService (Server)
-
-A central hub that receives payloads via RabbitMQ or REST, stores them in PostgreSQL, and hosts a web UI for fleet management.
-
-### Configuration
-Edit `SystemCollectorService/appsettings.json`:
-- `CollectorSettings:ConnectionString` - PostgreSQL connection string.
-- `CollectorSettings:ListenUrl` - HTTPS listen address (default `https://0.0.0.0:5101`).
-- `CollectorSettings:RetentionDays` - How many days of data to keep (default `7`).
-
-### UI & API
-- **Web UI:** `https://<collector-host>:5101/`
-- `POST /api/v1/metrics` - Ingests metrics (queued via RabbitMQ).
-- `POST /api/v1/machines/{name}/commands` - Sends remote commands (e.g., `restart`).
+- **Standalone Architecture:** Migrated to SQLite. No more Docker, PostgreSQL, or RabbitMQ required.
+- **Zero Dependencies:** Bundles the .NET 10 runtime (Self-Contained), so no pre-installation is needed on target machines.
+- **Cross-Platform:** Full support for Windows and Linux.
+- **HTTP Mode:** Defaulting to HTTP on port `5100` to avoid certificate issues in local environments.
+- **Automated Installers:** Professional `.exe` installers for Windows and `.deb` packaging for Linux.
 
 ---
 
-## SystemMonitorService (Client)
+## 💻 Deployment
 
-Windows service that samples system metrics and pushes them to the collector.
+### Windows
+The easiest way to install is using the provided installers:
+1. **SystemMonitorFullSetup.exe:** Installs both Server and Client.
+2. **SystemMonitorServerSetup.exe:** Installs only the Collector (API & Dashboard).
+3. **SystemMonitorClientSetup.exe:** Installs only the Agent.
 
-### Configuration
-Edit `SystemMonitorService/appsettings.json`:
-- `MonitorSettings:CollectorEndpoint` - REST endpoint (e.g., `https://<collector-ip>:5101/api/v1/metrics`).
-- `MonitorSettings:PushIntervalSeconds` - Frequency of data uploads (default `30`).
+*Default Port:* `5100`
+*Data Path:* `%ProgramData%\SystemMonitor\`
+
+### Linux
+You can install the agent or server using the provided scripts:
+- **One-Liner Install (Agent):**
+  `curl -sSL https://raw.githubusercontent.com/taskscape/SystemMonitor/main/install_agent.sh | sudo bash`
+- **Manual Setup:** Use `setup_linux.sh` for interactive installation or `create_deb.sh` to generate native Debian packages.
+
+*Data Path:* `~/.systemmonitor/` (to avoid permission issues).
 
 ---
 
-## SystemMonitorMobile (App)
+## 🛠 Component Overview
 
-MAUI application to monitor your fleet from anywhere. Supports Android, iOS, and Windows.
+### SystemCollectorService (Server)
+The central hub that receives metrics and hosts the web dashboard.
+- **Dashboard:** `http://<server-ip>:5100/`
+- **Storage:** SQLite database with automatic 7-day retention cleanup.
 
-### Configuration
-- Enter the Server URL on the first launch (e.g., `https://<collector-ip>:5101`).
-- Supports SSL bypass for development environments.
+### SystemMonitorService (Agent)
+A background service that samples CPU, RAM, Disk, and Process usage.
+- **Local Buffering:** Stores metrics locally if the server is unreachable.
+- **Auto-Config:** Automatically configures permissions and firewall rules during installation.
+
+### SystemMonitorMobile (App)
+MAUI application to monitor your fleet from any device. Update `appsettings.json` with your Server IP.
