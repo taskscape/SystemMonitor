@@ -1,4 +1,4 @@
-# SystemMonitor Suite
+# SystemMonitor
 
 A lightweight, standalone system monitoring solution consisting of a Windows Service (Collector), a Client Agent (Monitor), and a Mobile App.
 
