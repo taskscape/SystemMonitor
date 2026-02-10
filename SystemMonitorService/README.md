@@ -1,29 +1,18 @@
-# SystemMonitorService (Agent)
+# SystemMonitorService
 
-Solution: SystemMonitor
+The background agent that collects performance data and sends it to the collector.
 
-## Intended use
+## Standalone Features
+- **Self-Contained:** No .NET runtime required on the host machine.
+- **Dual Storage:** Uses local SQLite buffering to prevent data loss during network outages.
+- **Smart Paths:** 
+  - **Windows:** Uses `C:\ProgramData\SystemMonitorService\`
+  - **Linux:** Uses `~/.systemmonitor-agent/` (allows running without sudo).
 
-Windows service that samples CPU, RAM, disk, and per-process usage. It stores samples in a local SQLite buffer and pushes them to the `SystemCollectorService` periodically.
+## Installation
+- **Windows:** Use `SystemMonitorClientSetup.exe`.
+- **Linux:** Run `install_agent.sh` or use `sudo apt install ./system-monitor-agent.deb`.
 
-## Features
-
-- **Resilience:** Local SQLite storage ensures no data is lost during network outages.
-- **Remote Restart:** Capable of executing system restarts received from the central server.
-
-## Installation & Setup
-
-### Windows
-Run as an administrator to access full system metrics:
-```powershell
-sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemMonitorService
-```
-
-## Configuration
-
-File: `appsettings.json`
-
-- `MonitorSettings:CollectorEndpoint`: URL of the collector (e.g., `https://your-server:5101/api/v1/metrics`).
-- `MonitorSettings:PushIntervalSeconds`: Delay between data uploads (default `30`).
-- `MonitorSettings:TrustAllCertificates`: Set to `true` if using self-signed HTTPS certificates.
+## Configuration (`appsettings.json`)
+- `MonitorSettings:CollectorEndpoint`: Point this to your server (e.g., `http://192.168.1.50:5100/api/v1/metrics`).
+- `MonitorSettings:RetentionDays`: Local history size (default 7 days).

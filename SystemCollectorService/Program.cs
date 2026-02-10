@@ -47,13 +47,12 @@ builder.Services.AddHostedService<StartupService>();
 builder.Services.AddHostedService<DatabaseCleanupService>();
 
 var listenUrl = builder.Configuration.GetValue<string>($"{CollectorSettings.SectionName}:ListenUrl")
-    ?? "https://0.0.0.0:5101";
+    ?? "http://0.0.0.0:5100";
 
 builder.WebHost.UseUrls(listenUrl);
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
