@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Options;
-using Npgsql;
+using Microsoft.Data.Sqlite;
 using SystemCollectorService;
+
+// Ensure configuration files are found when running as Windows Service
+Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,21 +12,29 @@ builder.Services.AddWindowsService();
 builder.Services.Configure<CollectorSettings>(
     builder.Configuration.GetSection(CollectorSettings.SectionName));
 
+// Resolve relative SQLite path to CommonApplicationData
+builder.Services.PostConfigure<CollectorSettings>(settings =>
+{
+    var connBuilder = new SqliteConnectionStringBuilder(settings.ConnectionString);
+    if (!string.IsNullOrEmpty(connBuilder.DataSource) && 
+        !Path.IsPathRooted(connBuilder.DataSource) && 
+        connBuilder.DataSource != ":memory:")
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var folder = Path.Combine(appData, "SystemMonitor");
+        if (!Directory.Exists(folder))
+        {
+            Directory.CreateDirectory(folder);
+        }
+        connBuilder.DataSource = Path.Combine(folder, connBuilder.DataSource);
+        settings.ConnectionString = connBuilder.ToString();
+    }
+});
+
 builder.Services.AddSingleton<DatabaseInitializer>();
 builder.Services.AddSingleton<CollectorRepository>();
 builder.Services.AddHostedService<StartupService>();
 builder.Services.AddHostedService<DatabaseCleanupService>();
-
-// RabbitMQ Services
-builder.Services.AddSingleton<IMetricsProducer, RabbitMqProducer>();
-builder.Services.AddHostedService<MetricsConsumer>();
-
-builder.Services.AddSingleton(sp =>
-{
-    var settings = sp.GetRequiredService<IOptions<CollectorSettings>>().Value;
-    var dataSourceBuilder = new NpgsqlDataSourceBuilder(settings.ConnectionString);
-    return dataSourceBuilder.Build();
-});
 
 var listenUrl = builder.Configuration.GetValue<string>($"{CollectorSettings.SectionName}:ListenUrl")
     ?? "https://0.0.0.0:5101";
@@ -38,7 +49,7 @@ app.UseStaticFiles();
 
 app.MapPost("/api/v1/metrics", async (
     List<MetricsPayload> payload,
-    IMetricsProducer producer,
+    CollectorRepository repository,
     CancellationToken cancellationToken) =>
 {
     if (payload.Count == 0)
@@ -46,10 +57,9 @@ app.MapPost("/api/v1/metrics", async (
         return Results.BadRequest("Payload is empty.");
     }
 
-    // Publish to queue instead of writing to DB synchronously
-    await producer.PublishMetricsAsync(payload, cancellationToken);
+    // Write directly to SQLite instead of RabbitMQ
+    await repository.StoreBatchAsync(payload, cancellationToken);
     
-    // Return Accepted (202) to indicate processing has started
     return Results.Accepted();
 });
 

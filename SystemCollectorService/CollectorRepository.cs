@@ -1,22 +1,36 @@
-using Npgsql;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Options;
 
 namespace SystemCollectorService;
 
 public sealed class CollectorRepository
 {
-    private readonly NpgsqlDataSource _dataSource;
+    private readonly string _connectionString;
     private readonly ILogger<CollectorRepository> _logger;
 
-    public CollectorRepository(NpgsqlDataSource dataSource, ILogger<CollectorRepository> logger)
+    public CollectorRepository(IOptions<CollectorSettings> settings, ILogger<CollectorRepository> logger)
     {
-        _dataSource = dataSource;
+        _connectionString = settings.Value.ConnectionString;
         _logger = logger;
+    }
+
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)
+    {
+        var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        
+        // Enforce foreign keys
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "PRAGMA foreign_keys = ON;";
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+        return connection;
     }
 
     public async Task StoreBatchAsync(IReadOnlyList<MetricsPayload> payload, CancellationToken cancellationToken)
     {
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         foreach (var sample in payload)
         {
@@ -52,7 +66,7 @@ public sealed class CollectorRepository
     public async Task<IReadOnlyList<MachineSummaryDto>> GetMachinesAsync(CancellationToken cancellationToken)
     {
         var results = new List<MachineSummaryDto>();
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT name, last_seen_utc
@@ -65,7 +79,7 @@ public sealed class CollectorRepository
         {
             results.Add(new MachineSummaryDto(
                 reader.GetString(0),
-                reader.GetFieldValue<DateTimeOffset>(1)));
+                DateTimeOffset.Parse(reader.GetString(1))));
         }
 
         return results;
@@ -73,7 +87,7 @@ public sealed class CollectorRepository
 
     public async Task<MachineCurrentDto?> GetCurrentAsync(string machineName, CancellationToken cancellationToken)
     {
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
@@ -94,7 +108,7 @@ public sealed class CollectorRepository
 
         var dto = new MachineCurrentDto(
             reader.GetString(0),
-            reader.GetFieldValue<DateTimeOffset>(1),
+            DateTimeOffset.Parse(reader.GetString(1)),
             reader.GetDouble(2),
             reader.GetDouble(3),
             reader.GetDouble(4),
@@ -117,7 +131,7 @@ public sealed class CollectorRepository
         var results = new List<HistoryPointDto>();
         var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
 
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT c.bucket_start_utc,
@@ -132,13 +146,13 @@ public sealed class CollectorRepository
             ORDER BY c.bucket_start_utc;
             """;
         command.Parameters.AddWithValue("@name", machineName);
-        command.Parameters.AddWithValue("@cutoff", cutoff);
+        command.Parameters.AddWithValue("@cutoff", cutoff); // ToString implicitly
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             results.Add(new HistoryPointDto(
-                reader.GetFieldValue<DateTimeOffset>(0),
+                DateTimeOffset.Parse(reader.GetString(0)),
                 reader.GetDouble(1),
                 (long)reader.GetDouble(2),
                 (long)reader.GetDouble(3),
@@ -170,8 +184,8 @@ public sealed class CollectorRepository
     }
 
     private static async Task<int> UpsertMachineAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction? transaction,
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
         string machineName,
         DateTimeOffset lastSeenUtc,
         CancellationToken cancellationToken)
@@ -192,8 +206,8 @@ public sealed class CollectorRepository
     }
 
     private static async Task<long> InsertMachineSampleAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         int machineId,
         MachineSamplePayload machine,
         CancellationToken cancellationToken)
@@ -218,8 +232,8 @@ public sealed class CollectorRepository
     }
 
     private static async Task UpsertMinuteCacheAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         int machineId,
         DateTimeOffset bucketStartUtc,
         MachineSamplePayload machine,
@@ -275,8 +289,8 @@ public sealed class CollectorRepository
     }
 
     private static async Task InsertDrivesAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         long machineSampleId,
         IReadOnlyList<DriveSamplePayload> drives,
         CancellationToken cancellationToken)
@@ -287,10 +301,10 @@ public sealed class CollectorRepository
             INSERT INTO drive_samples (machine_sample_id, name, total_bytes, used_bytes)
             VALUES (@machine_id, @name, @total, @used);
             """;
-        var machineParam = command.Parameters.Add("@machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var nameParam = command.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text);
-        var totalParam = command.Parameters.Add("@total", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var usedParam = command.Parameters.Add("@used", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var machineParam = command.Parameters.Add("@machine_id", SqliteType.Integer);
+        var nameParam = command.Parameters.Add("@name", SqliteType.Text);
+        var totalParam = command.Parameters.Add("@total", SqliteType.Integer);
+        var usedParam = command.Parameters.Add("@used", SqliteType.Integer);
 
         foreach (var drive in drives)
         {
@@ -303,8 +317,8 @@ public sealed class CollectorRepository
     }
 
     private static async Task InsertProcessesAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
+        SqliteConnection connection,
+        SqliteTransaction transaction,
         long machineSampleId,
         IReadOnlyList<ProcessSamplePayload> processes,
         CancellationToken cancellationToken)
@@ -317,11 +331,11 @@ public sealed class CollectorRepository
             VALUES
                 (@machine_id, @pid, @name, @cpu, @ram);
             """;
-        var machineParam = command.Parameters.Add("@machine_id", NpgsqlTypes.NpgsqlDbType.Bigint);
-        var pidParam = command.Parameters.Add("@pid", NpgsqlTypes.NpgsqlDbType.Integer);
-        var nameParam = command.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text);
-        var cpuParam = command.Parameters.Add("@cpu", NpgsqlTypes.NpgsqlDbType.Double);
-        var ramParam = command.Parameters.Add("@ram", NpgsqlTypes.NpgsqlDbType.Bigint);
+        var machineParam = command.Parameters.Add("@machine_id", SqliteType.Integer);
+        var pidParam = command.Parameters.Add("@pid", SqliteType.Integer);
+        var nameParam = command.Parameters.Add("@name", SqliteType.Text);
+        var cpuParam = command.Parameters.Add("@cpu", SqliteType.Real);
+        var ramParam = command.Parameters.Add("@ram", SqliteType.Integer);
 
         foreach (var process in processes)
         {
@@ -335,7 +349,7 @@ public sealed class CollectorRepository
     }
 
     private static async Task<long?> GetLatestSampleIdAsync(
-        NpgsqlConnection connection,
+        SqliteConnection connection,
         string machineName,
         CancellationToken cancellationToken)
     {
@@ -355,7 +369,7 @@ public sealed class CollectorRepository
     }
 
     private static async Task<IReadOnlyList<DriveSnapshotDto>> GetDrivesAsync(
-        NpgsqlConnection connection,
+        SqliteConnection connection,
         long machineSampleId,
         CancellationToken cancellationToken)
     {
@@ -382,7 +396,7 @@ public sealed class CollectorRepository
 
     public async Task AddCommandAsync(string machineName, string commandType, CancellationToken cancellationToken)
     {
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         
         // First ensure the machine exists
         var machineId = await UpsertMachineAsync(connection, null, machineName, DateTimeOffset.UtcNow, cancellationToken);
@@ -402,7 +416,7 @@ public sealed class CollectorRepository
     public async Task<IReadOnlyList<CommandResponseDto>> GetPendingCommandsAsync(string machineName, CancellationToken cancellationToken)
     {
         var results = new List<CommandResponseDto>();
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT c.id, c.command_type, c.created_at_utc
@@ -419,7 +433,7 @@ public sealed class CollectorRepository
             results.Add(new CommandResponseDto(
                 reader.GetInt64(0),
                 reader.GetString(1),
-                reader.GetFieldValue<DateTimeOffset>(2)));
+                DateTimeOffset.Parse(reader.GetString(2))));
         }
 
         return results;
@@ -427,7 +441,7 @@ public sealed class CollectorRepository
 
     public async Task UpdateCommandStatusAsync(long commandId, string status, string? result, CancellationToken cancellationToken)
     {
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
             UPDATE machine_commands
@@ -447,8 +461,8 @@ public sealed class CollectorRepository
         var cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
         _logger.LogInformation("Cleaning up data older than {Cutoff}...", cutoff);
 
-        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         try
         {
