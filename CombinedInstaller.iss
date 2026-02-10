@@ -20,6 +20,10 @@ Name: "custom"; Description: "Custom installation"; Flags: iscustom
 Name: "server"; Description: "System Monitor Server (Collector)"; Types: full server_only custom
 Name: "client"; Description: "System Monitor Client (Agent)"; Types: full client_only custom
 
+[Dirs]
+Name: "{commonappdata}\SystemMonitor"; Permissions: users-modify
+Name: "{commonappdata}\SystemMonitorService"; Permissions: users-modify
+
 [Files]
 ; Server Files
 Source: "publish_collector\*"; DestDir: "{app}\Server"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: server

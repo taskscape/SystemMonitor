@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: system_monitor_db
+    restart: always
     environment:
       POSTGRES_PASSWORD: monitor_password
       POSTGRES_DB: system_monitor
@@ -15,6 +16,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: system_monitor_mq
+    restart: always
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest

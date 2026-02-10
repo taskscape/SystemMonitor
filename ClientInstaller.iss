@@ -10,6 +10,9 @@ SolidCompression=yes
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 
+[Dirs]
+Name: "{commonappdata}\SystemMonitorService"; Permissions: users-modify
+
 [Files]
 Source: "publish_monitor\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
