@@ -1,59 +1,60 @@
-# SystemMonitor
+# SystemMonitor Suite
 
-A distributed system monitoring solution consisting of a Windows Service (Collector), a Client Service (Monitor), and a Mobile App.
+A lightweight, standalone system monitoring solution consisting of a Windows Service (Collector), a Client Agent (Monitor), and a Mobile App.
 
-## Features
+## Standalone Architecture
 
-- **Real-time Monitoring:** Tracks CPU, RAM, Disk usage, and top processes.
-- **Remote Commands:** Trigger system restarts directly from the Web UI or Mobile App.
-- **Asynchronous Ingestion:** Uses RabbitMQ to handle high-volume metrics data.
-- **History & Analytics:** 7-day retention with aggregated minute-by-minute cache.
-- **Auto-Cleanup:** Built-in background service to prune old data automatically.
+The system has been migrated to a **standalone SQLite architecture**. It no longer requires Docker, PostgreSQL, or RabbitMQ. Data is stored in local SQLite databases, making it extremely easy to deploy.
 
-## Infrastructure (Server-side)
+### Key Features:
+- **Zero External Dependencies:** No database or message queue servers required.
+- **SQLite Storage:** High-performance local storage for both Collector and Monitor.
+- **Automated Installers:** Simple `.exe` installers that configure everything automatically.
+- **Self-Contained:** Bundles the .NET runtime, so no pre-installation is needed.
 
-The system uses **RabbitMQ** for metrics queuing and **PostgreSQL** for storage. The easiest way to start the infrastructure is using Docker:
+## Deployment
 
-```bash
-docker-compose up -d
-```
+The easiest way to install the system is using the provided installers:
 
-This will start:
-- **PostgreSQL** on port `5433` (mapped from `5432`)
-- **RabbitMQ** on ports `5672` (AMQP) and `15672` (Management UI)
+1.  **SystemMonitorFullSetup.exe:** Installs both the Server (Collector) and the Client (Agent) on a single machine.
+2.  **SystemMonitorServerSetup.exe:** Installs only the Collector (API and Dashboard).
+3.  **SystemMonitorClientSetup.exe:** Installs only the Agent on machines you wish to monitor.
+
+### Automatic Configuration
+- **Database location:** `%ProgramData%\SystemMonitor\`
+- **Logs:** `%ProgramData%\SystemMonitor\logs\`
+- **HTTPS Port:** `5101` (Traffic is encrypted by default)
+
+---
 
 ## SystemCollectorService (Server)
 
-A central hub that receives payloads via RabbitMQ or REST, stores them in PostgreSQL, and hosts a web UI for fleet management.
+A centralized service that receives metrics from agents, stores them in SQLite, and provides a modern web dashboard.
 
-### Configuration
-Edit `SystemCollectorService/appsettings.json`:
-- `CollectorSettings:ConnectionString` - PostgreSQL connection string.
-- `CollectorSettings:ListenUrl` - HTTPS listen address (default `https://0.0.0.0:5101`).
-- `CollectorSettings:RetentionDays` - How many days of data to keep (default `7`).
+### Web UI & API
+- **Dashboard:** `https://localhost:5101/`
+- **Metrics API:** `POST /api/v1/metrics`
+- **Machine List:** `GET /api/v1/machines`
 
-### UI & API
-- **Web UI:** `https://<collector-host>:5101/`
-- `POST /api/v1/metrics` - Ingests metrics (queued via RabbitMQ).
-- `POST /api/v1/machines/{name}/commands` - Sends remote commands (e.g., `restart`).
+### Configuration (`appsettings.json`)
+- `CollectorSettings:ConnectionString` - SQLite connection string (default: `Data Source=system_monitor.db`).
+- `CollectorSettings:RetentionDays` - How many days of history to keep (default: `7`).
 
 ---
 
-## SystemMonitorService (Client)
+## SystemMonitorService (Client Agent)
 
-Windows service that samples system metrics and pushes them to the collector.
+A background service that samples CPU, RAM, disk, and process usage, stores them locally if the server is offline, and pushes them to the collector.
 
-### Configuration
-Edit `SystemMonitorService/appsettings.json`:
-- `MonitorSettings:CollectorEndpoint` - REST endpoint (e.g., `https://<collector-ip>:5101/api/v1/metrics`).
-- `MonitorSettings:PushIntervalSeconds` - Frequency of data uploads (default `30`).
+### Configuration (`appsettings.json`)
+- `MonitorSettings:CollectorEndpoint` - Address of your collector (e.g., `https://192.168.1.10:5101/api/v1/metrics`).
+- `MonitorSettings:TrustAllCertificates` - Set to `true` if using self-signed development certificates.
 
 ---
 
-## SystemMonitorMobile (App)
+## SystemMonitorMobile (Mobile App)
 
-MAUI application to monitor your fleet from anywhere. Supports Android, iOS, and Windows.
+A MAUI application to monitor your fleet from any device.
 
-### Configuration
-- Enter the Server URL on the first launch (e.g., `https://<collector-ip>:5101`).
-- Supports SSL bypass for development environments.
+### Configuration (`appsettings.json`)
+- `CollectorSettings:BaseUrl` - URL of the collector (e.g., `https://192.168.1.10:5101`).
