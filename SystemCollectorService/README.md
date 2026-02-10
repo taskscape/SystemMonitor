@@ -4,7 +4,13 @@ Solution: SystemMonitor
 
 ## Intended use
 
-Windows service that receives metrics from SystemMonitorService, queues them via **RabbitMQ**, and processes them into **PostgreSQL**. It also serves a web UI and API.
+Central server that receives metrics from SystemMonitorService agents, queues them via **RabbitMQ**, and processes them into **PostgreSQL**. It also serves a web UI and provides an API for the mobile application.
+
+## Key Features
+
+- **Scalable Ingestion:** Producers push metrics to a queue, allowing the consumer to process data at an optimal pace.
+- **Data Retention:** Automatically prunes data older than a configured number of days using the `DatabaseCleanupService`.
+- **Remote Control:** Provides endpoints to queue system commands (like `restart`) for agents to pick up.
 
 ## Integration requirements
 
@@ -12,27 +18,23 @@ Windows service that receives metrics from SystemMonitorService, queues them via
 - **PostgreSQL:** Required for persistent storage.
 - Use `docker-compose up -d` in the root directory to start both.
 
-## Main software patterns
-
-- **RabbitMQ Integration:** Uses a Producer (REST API) and Consumer (Background Service) pattern for scalable ingestion.
-- **Minimal API:** For REST endpoints and static file hosting.
-- **Background Services:** One for database initialization and another for consuming RabbitMQ messages.
-
 ## Configuration
 
 File: `appsettings.json`
 
 - `CollectorSettings:ConnectionString`: PostgreSQL connection string.
 - `CollectorSettings:ListenUrl`: HTTPS listen URL (default `https://0.0.0.0:5101`).
-- `CollectorSettings:RabbitMqHostName`: RabbitMQ host (default `localhost`).
+- `CollectorSettings:RetentionDays`: Number of days to keep historical data (default `7`).
 
 ## Deployment
 
-Install as Windows service (elevated prompt):
-
+### Windows
+Install as a Windows service (elevated prompt):
 ```powershell
 sc.exe create SystemCollectorService binPath= "C:\Path\To\SystemCollectorService.exe" start= auto obj= LocalSystem
 sc.exe start SystemCollectorService
 ```
 
-Open UI: `https://<collector-host>:5101/`
+### Web Dashboard
+Open: `https://<collector-host>:5101/`
+The dashboard shows real-time status and allows sending restart commands to active machines.
