@@ -86,12 +86,23 @@ public sealed class CommandExecutor
     {
         _logger.LogWarning("SYSTEM RESTART INITIATED BY REMOTE COMMAND");
         
-        // /t 5 - wait 5 seconds (gives time for log flush and closing HTTP connections)
-        var psi = new ProcessStartInfo("shutdown", "/r /t 5 /f")
+        ProcessStartInfo psi;
+        if (OperatingSystem.IsWindows())
         {
-            CreateNoWindow = true,
-            UseShellExecute = false
-        };
+            // /t 5 - wait 5 seconds
+            psi = new ProcessStartInfo("shutdown", "/r /t 5 /f");
+        }
+        else
+        {
+            // Linux: reboot command
+            psi = new ProcessStartInfo("sudo")
+            {
+                Arguments = "-n reboot"
+            };
+        }
+
+        psi.CreateNoWindow = true;
+        psi.UseShellExecute = false;
         Process.Start(psi);
     }
 }

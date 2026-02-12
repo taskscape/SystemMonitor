@@ -7,12 +7,14 @@ Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
 var builder = WebApplication.CreateBuilder(args);
 
+#if OS_WINDOWS
 builder.Services.AddWindowsService();
+#endif
 
 builder.Services.Configure<CollectorSettings>(
     builder.Configuration.GetSection(CollectorSettings.SectionName));
 
-// Resolve relative SQLite path to CommonApplicationData
+// Resolve relative SQLite path to a writable system-specific folder
 builder.Services.PostConfigure<CollectorSettings>(settings =>
 {
     var connBuilder = new SqliteConnectionStringBuilder(settings.ConnectionString);
@@ -20,8 +22,16 @@ builder.Services.PostConfigure<CollectorSettings>(settings =>
         !Path.IsPathRooted(connBuilder.DataSource) && 
         connBuilder.DataSource != ":memory:")
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-        var folder = Path.Combine(appData, "SystemMonitor");
+        bool isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+        
+        // Use ProgramData on Windows, but Home directory on Linux to avoid /usr/share permission issues
+        var baseFolder = isWindows
+            ? Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        var folderName = isWindows ? "SystemMonitor" : ".systemmonitor";
+        var folder = Path.Combine(baseFolder, folderName);
+
         if (!Directory.Exists(folder))
         {
             Directory.CreateDirectory(folder);
