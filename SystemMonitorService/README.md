@@ -1,31 +1,18 @@
 # SystemMonitorService
 
-Solution: SystemMonitor (Agent)
-
-## Intended use
-
-Windows service that samples CPU, RAM, disk, and per-process usage, stores a short local history (SQLite), and pushes batched metrics to the collector.
+The background agent that collects performance data and sends it to the collector.
 
 ## Standalone Features
+- **Self-Contained:** No .NET runtime required on the host machine.
+- **Dual Storage:** Uses local SQLite buffering to prevent data loss during network outages.
+- **Smart Paths:** 
+  - **Windows:** Uses `C:\ProgramData\SystemMonitorService\`
+  - **Linux:** Uses `~/.systemmonitor-agent/` (allows running without sudo).
 
-- **Local Buffering:** Stores metrics in a local SQLite database if the collector is unreachable.
-- **Auto-Cleanup:** Automatically manages its local database size (default 7-day retention).
-- **Zero Dependencies:** Distributed as a self-contained executable with bundled .NET runtime.
+## Installation
+- **Windows:** Use `SystemMonitorClientSetup.exe`.
+- **Linux:** Run `install_agent.sh` or use `sudo apt install ./system-monitor-agent.deb`.
 
-## Configuration
-
-File: `appsettings.json`
-
-- `MonitorSettings:CollectorEndpoint`: REST endpoint (e.g., `https://your-server:5101/api/v1/metrics`).
-- `MonitorSettings:TrustAllCertificates`: Set to `true` for development/self-signed certificates.
-- `MonitorSettings:RetentionDays`: Local retention window (default 7 days).
-
-## Deployment
-
-The recommended way to install is using the **SystemMonitorClientSetup.exe** installer.
-
-Manual installation:
-```powershell
-sc.exe create SystemMonitorService binPath= "C:\Path\To\SystemMonitorService.exe" start= auto obj= LocalSystem
-sc.exe start SystemMonitorService
-```
+## Configuration (`appsettings.json`)
+- `MonitorSettings:CollectorEndpoint`: Point this to your server (e.g., `http://192.168.1.50:5100/api/v1/metrics`).
+- `MonitorSettings:RetentionDays`: Local history size (default 7 days).
