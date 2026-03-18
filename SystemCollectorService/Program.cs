@@ -18,6 +18,11 @@ builder.Services.Configure<CollectorSettings>(
 builder.Services.PostConfigure<CollectorSettings>(settings =>
 {
     var connBuilder = new SqliteConnectionStringBuilder(settings.ConnectionString);
+    
+    // Set Default Timeout (BusyTimeout) and Pooling for better concurrency
+    connBuilder.DefaultTimeout = 5000; // 5 seconds
+    connBuilder.Pooling = true; // Use connection pooling
+    
     if (!string.IsNullOrEmpty(connBuilder.DataSource) && 
         !Path.IsPathRooted(connBuilder.DataSource) && 
         connBuilder.DataSource != ":memory:")
@@ -37,8 +42,8 @@ builder.Services.PostConfigure<CollectorSettings>(settings =>
             Directory.CreateDirectory(folder);
         }
         connBuilder.DataSource = Path.Combine(folder, connBuilder.DataSource);
-        settings.ConnectionString = connBuilder.ToString();
     }
+    settings.ConnectionString = connBuilder.ToString();
 });
 
 builder.Services.AddSingleton<DatabaseInitializer>();
